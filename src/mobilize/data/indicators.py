@@ -151,6 +151,18 @@ FRED_CURVE_SERIES: dict[str, str] = {
     "20Y": "DGS20",
 }
 
-# Backtest window.
+# Backtest window: scores are observable at the END of year t-1 and drive
+# weights held through year t. Panel starts one year earlier so the first
+# rebalance (for FY2013) can use Dec-2012 data without look-ahead.
+PANEL_START_YEAR: int = 2012
 START_YEAR: int = 2013
 END_YEAR: int = 2023
+
+# Portfolio construction parameters.
+REBALANCE_MONTH: int = 12  # scores observed at end of December
+EXCLUDED_BOTTOM_PCT: float = 0.20  # screened portfolio drops bottom quintile
+TILT_POWER: float = 2.0  # weight ∝ score^TILT_POWER in the tilted portfolio
+
+# Bond-return proxy parameters (annual, 5Y-equivalent duration assumption).
+PROXY_DURATION: float = 5.0  # modified duration of the proxy sovereign portfolio
+RF_ANNUAL: float = 0.02  # risk-free rate for Sharpe/Sortino (conservative USD T-bill proxy)
