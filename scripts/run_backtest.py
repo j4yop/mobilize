@@ -40,14 +40,26 @@ PANEL_PATH = DATA_DIR / "processed" / "esg_panel.parquet"
 OUT_PATH = DATA_DIR / "processed" / "backtest_results.parquet"
 
 
+def _year_end_yield(df: pd.DataFrame) -> pd.Series:
+    """Last available observation per calendar year (year-end yield level)."""
+    df = df.dropna(subset=["value"]).sort_values("date")
+    return df.groupby("year")["value"].last() / 100.0
+
+
 def build_yield_matrix(panel: pd.DataFrame) -> pd.DataFrame:
-    """Year x iso3 yield matrix (decimals) mixing observed & synthetic yields."""
+    """Year x iso3 yield matrix (decimals) mixing observed & synthetic yields.
+
+    Convention: YEAR-END yield levels (last observation of each December),
+    so annual returns = carry from year-end (t-1) minus duration times the
+    year-end (t-1) -> year-end (t) change. This captures full-year yield
+    moves (e.g. 2013 taper tantrum) that annual means would dampen.
+    """
     years = list(range(PANEL_START_YEAR - 1, END_YEAR + 1))  # need t-1 for first return
     us5y = fetch_series(FRED_CURVE_SERIES["5Y"])
     us5y["year"] = us5y["date"].dt.year
-    us_yearly = us5y.groupby("year")["value"].mean() / 100.0
+    us_yearly = _year_end_yield(us5y)
 
-    # DM yields from FRED long-term series (annual mean)
+    # DM yields from FRED long-term series (year-end observation)
     dm_yield: dict[str, pd.Series] = {}
     for iso3, series_id in FRED_DM_SERIES.items():
         if iso3 == "USA":
@@ -55,8 +67,7 @@ def build_yield_matrix(panel: pd.DataFrame) -> pd.DataFrame:
         try:
             df = fetch_series(series_id)
             df["year"] = df["date"].dt.year
-            # FRED OECD monthly series are % already; annual mean
-            dm_yield[iso3] = df.groupby("year")["value"].mean() / 100.0
+            dm_yield[iso3] = _year_end_yield(df)
         except Exception:  # noqa: BLE001
             continue
 
