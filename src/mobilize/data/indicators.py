@@ -163,6 +163,8 @@ REBALANCE_MONTH: int = 12  # scores observed at end of December
 EXCLUDED_BOTTOM_PCT: float = 0.20  # screened portfolio drops bottom quintile
 TILT_POWER: float = 2.0  # weight ∝ score^TILT_POWER in the tilted portfolio
 
-# Bond-return proxy parameters (annual, 5Y-equivalent duration assumption).
-PROXY_DURATION: float = 5.0  # modified duration of the proxy sovereign portfolio
+# Bond-return proxy parameters.
+# All yield series are ~10-year benchmark tenor (US: DGS10; OECD series are
+# long-term/10y-equivalent), so the portfolio duration matches that tenor.
+PROXY_DURATION: float = 8.0  # modified duration of the ~10Y proxy sovereign portfolio
 RF_ANNUAL: float = 0.02  # risk-free rate for Sharpe/Sortino (conservative USD T-bill proxy)

@@ -19,7 +19,6 @@ from mobilize.backtest.metrics import (
 from mobilize.backtest.returns import (
     duration_proxy_return,
     portfolio_annual_returns,
-    synthetic_em_yield,
 )
 from mobilize.backtest.significance import compare_portfolios
 
@@ -28,19 +27,10 @@ from mobilize.backtest.significance import compare_portfolios
 def test_duration_proxy_return_formula():
     # carry 5%, yields flat -> return = 5%
     assert duration_proxy_return(0.05, 0.05) == pytest.approx(0.05)
-    # yields fall 1% with D=5 -> return = 5% + 5% = 10%
-    assert duration_proxy_return(0.05, 0.04, duration=5.0) == pytest.approx(0.10)
-    # yields rise 1% -> return = 5% - 5% = 0%
-    assert duration_proxy_return(0.05, 0.06, duration=5.0) == pytest.approx(0.00)
-
-
-def test_synthetic_em_yield_monotonicities():
-    base = synthetic_em_yield(0.04, debt_gdp=50, reserves_gdp=20, inflation=3, gov_score=50)
-    more_debt = synthetic_em_yield(0.04, debt_gdp=100, reserves_gdp=20, inflation=3, gov_score=50)
-    better_gov = synthetic_em_yield(0.04, debt_gdp=50, reserves_gdp=20, inflation=3, gov_score=90)
-    assert more_debt > base
-    assert better_gov < base
-    assert base > 0.04  # sovereign spread is positive
+    # yields fall 1% with D=8 -> return = 5% + 8% = 13%
+    assert duration_proxy_return(0.05, 0.04, duration=8.0) == pytest.approx(0.13)
+    # yields rise 1% -> return = 5% - 8% = -3%
+    assert duration_proxy_return(0.05, 0.06, duration=8.0) == pytest.approx(-0.03)
 
 
 def test_portfolio_annual_returns_weighting():

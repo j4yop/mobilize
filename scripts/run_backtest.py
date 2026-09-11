@@ -1,7 +1,9 @@
-"""Run the M2 backtest: weights -> proxy returns -> metrics -> significance.
+"""Run the full analysis: calibration -> annual + monthly backtests + Fama-MacBeth.
 
 Requires data/processed/esg_panel.parquet (from `make data`).
-Writes data/processed/backtest_results.parquet and prints a summary.
+Writes data/processed/backtest_results.parquet (annual),
+        data/processed/backtest_monthly.parquet (monthly),
+        data/processed/fama_macbeth.parquet (gamma series).
 """
 
 from __future__ import annotations
@@ -15,20 +17,21 @@ import pandas as pd
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from mobilize.backtest.metrics import (  # noqa: E402
-    cagr,
-    max_drawdown,
-    summary_table,
+from mobilize.backtest.fama_macbeth import monthly_fama_macbeth  # noqa: E402
+from mobilize.backtest.metrics import max_drawdown, summary_table  # noqa: E402
+from mobilize.backtest.monthly import (  # noqa: E402
+    map_annual_weights_to_months,
+    monthly_metrics,
+    monthly_returns_from_yields,
+    portfolio_monthly_returns,
 )
 from mobilize.backtest.returns import (  # noqa: E402
-    FRED_DM_SERIES,
     annual_returns_from_yields,
     portfolio_annual_returns,
-    synthetic_em_yield,
 )
 from mobilize.backtest.significance import compare_portfolios  # noqa: E402
-from mobilize.data.fred import fetch_series  # noqa: E402
-from mobilize.data.indicators import END_YEAR, FRED_CURVE_SERIES, PANEL_START_YEAR  # noqa: E402
+from mobilize.backtest.yields import annual_yield_matrix, monthly_yield_matrix  # noqa: E402
+from mobilize.data.indicators import END_YEAR, PANEL_START_YEAR, START_YEAR  # noqa: E402
 from mobilize.portfolio.construction import (  # noqa: E402
     BENCHMARK,
     composition_summary,
@@ -37,89 +40,9 @@ from mobilize.portfolio.construction import (  # noqa: E402
 
 DATA_DIR = REPO_ROOT / "data"
 PANEL_PATH = DATA_DIR / "processed" / "esg_panel.parquet"
-OUT_PATH = DATA_DIR / "processed" / "backtest_results.parquet"
-
-
-def _year_end_yield(df: pd.DataFrame) -> pd.Series:
-    """Last available observation per calendar year (year-end yield level)."""
-    df = df.dropna(subset=["value"]).sort_values("date")
-    return df.groupby("year")["value"].last() / 100.0
-
-
-def build_yield_matrix(panel: pd.DataFrame) -> pd.DataFrame:
-    """Year x iso3 yield matrix (decimals) mixing observed & synthetic yields.
-
-    Convention: YEAR-END yield levels (last observation of each December),
-    so annual returns = carry from year-end (t-1) minus duration times the
-    year-end (t-1) -> year-end (t) change. This captures full-year yield
-    moves (e.g. 2013 taper tantrum) that annual means would dampen.
-    """
-    years = list(range(PANEL_START_YEAR - 1, END_YEAR + 1))  # need t-1 for first return
-    us5y = fetch_series(FRED_CURVE_SERIES["5Y"])
-    us5y["year"] = us5y["date"].dt.year
-    us_yearly = _year_end_yield(us5y)
-
-    # DM yields from FRED long-term series (year-end observation)
-    dm_yield: dict[str, pd.Series] = {}
-    for iso3, series_id in FRED_DM_SERIES.items():
-        if iso3 == "USA":
-            continue
-        try:
-            df = fetch_series(series_id)
-            df["year"] = df["date"].dt.year
-            dm_yield[iso3] = _year_end_yield(df)
-        except Exception:  # noqa: BLE001
-            continue
-
-    # Macro panel for synthetic EM yields
-    macro = panel.set_index(["iso3", "year"])
-
-    def _reserves_gdp(iso3: str, year: int) -> float | None:
-        try:
-            res = macro.loc[(iso3, year), "FI.RES.TOTL.CD"]
-            gdp = macro.loc[(iso3, year), "NY.GDP.MKTP.CD"]
-            return float(res / gdp * 100) if gdp else None
-        except Exception:  # noqa: BLE001
-            return None
-
-    def _gov(iso3: str, year: int) -> float | None:
-        try:
-            g = macro.loc[(iso3, year), "pillar_G"]
-            return None if pd.isna(g) else float(g)
-        except Exception:  # noqa: BLE001
-            return None
-
-    rows = {}
-    for iso3 in panel["iso3"].unique():
-        series = {}
-        for year in years:
-            if iso3 == "USA":
-                series[year] = float(us_yearly.get(year, np.nan))
-            elif iso3 in dm_yield:
-                series[year] = float(dm_yield[iso3].get(year, np.nan))
-                if not np.isfinite(series[year]):
-                    series[year] = float(us_yearly.get(year, np.nan) + 0.01)
-            else:
-                # EM synthetic
-                try:
-                    debt = macro.loc[(iso3, year), "GC.DOD.TOTL.GD.ZS"]
-                    infl = macro.loc[(iso3, year), "FP.CPI.TOTL.ZG"]
-                except KeyError:
-                    debt, infl = None, None
-                debt = float(debt) if pd.notna(debt) else None
-                infl = float(infl) if pd.notna(infl) else None
-                series[year] = synthetic_em_yield(
-                    float(us_yearly.get(year, 0.04)),
-                    debt,
-                    _reserves_gdp(iso3, year),
-                    infl,
-                    _gov(iso3, year),
-                )
-        rows[iso3] = series
-
-    ym = pd.DataFrame(rows)
-    ym.index.name = "year"
-    return ym.reset_index()
+OUT_ANNUAL = DATA_DIR / "processed" / "backtest_results.parquet"
+OUT_MONTHLY = DATA_DIR / "processed" / "backtest_monthly.parquet"
+OUT_FM = DATA_DIR / "processed" / "fama_macbeth.parquet"
 
 
 def main() -> None:
@@ -127,36 +50,98 @@ def main() -> None:
     print(f"Loaded panel: {len(panel)} rows, years "
           f"{panel['year'].min()}-{panel['year'].max()}")
 
-    print("[1/4] Building yield matrix (FRED observed + EM synthetic) ...")
-    yields = build_yield_matrix(panel)
-    print(f"      {yields.shape[1]-1} countries, {yields['year'].min()}-{yields['year'].max()}")
+    # ---------- Yields + calibration ----------
+    print("[1/6] Building annual yield matrix (DM observed, EM calibrated) ...")
+    ym, model, diag = annual_yield_matrix(panel, PANEL_START_YEAR - 1, END_YEAR)
+    print(f"      calibration n={diag['n_calibration_rows']}, "
+          f"R2(constrained)={diag['calibration_r2']:.3f}, "
+          f"R2(unconstrained)={diag['calibration_r2_unconstr']:.3f}")
+    print("      beta (constrained):", {k: f"{v:.4f}" for k, v in diag["beta"].items()})
+    print(f"      universe with yields: {diag['n_universe_with_yields']}/{panel['iso3'].nunique()}")
 
-    print("[2/4] Portfolio weights per year (no look-ahead) ...")
+    from mobilize.backtest.calibration import expanding_window_cv, prepare_backfill
+
+    cal_rows = []
+    from mobilize.backtest.calibration import build_features
+    from mobilize.backtest.yields import _fetch_all_dm
+
+    dm = _fetch_all_dm()
+    year_end = {}
+    for iso3, df in dm.items():
+        d = df.dropna(subset=["value"]).sort_values("date").copy()
+        d["year"] = d["date"].dt.year
+        year_end[iso3] = d.groupby("year")["value"].last() / 100.0
+    backfill = prepare_backfill(panel)
+    for iso3 in year_end:
+        for yr in range(PANEL_START_YEAR - 1, END_YEAR + 1):
+            y = year_end[iso3].get(yr)
+            us = year_end["USA"].get(yr)
+            if y is None or us is None:
+                continue
+            f = build_features(panel, iso3, yr, float(us), float(y), nearest_backfill=backfill)
+            if f is not None:
+                cal_rows.append(f)
+    cv_rmse = expanding_window_cv(cal_rows)
+    print(f"      expanding-window CV RMSE: {cv_rmse:.4f} ({cv_rmse*10000:.0f}bp)")
+
+    # ---------- Annual backtest ----------
+    print("[2/6] Annual backtest (year-end yields) ...")
     wdf = weight_panel(panel)
     comp = composition_summary(wdf)
     print(comp.groupby("portfolio")[["n_holdings", "effective_n", "max_weight"]].mean().to_string())
 
-    print("[3/4] Annual returns + metrics ...")
-    rets_wide = annual_returns_from_yields(yields)
+    rets_wide = annual_returns_from_yields(ym)
     port = portfolio_annual_returns(rets_wide, wdf)
     metrics = summary_table(port, benchmark_col=BENCHMARK)
-    print("\n=== Portfolio metrics (2013-2023, annual) ===")
-    print((metrics * 1).to_string(float_format=lambda x: f"{x: .4f}"))
+    print("\n=== Annual portfolio metrics (2013-2023) ===")
+    print(metrics.to_string(float_format=lambda x: f"{x: .4f}"))
 
-    print("\n=== Bootstrap comparison vs benchmark ===")
+    print("\n=== Annual significance vs benchmark ===")
     comp_stats = compare_portfolios(port, benchmark_col=BENCHMARK)
     print(comp_stats.to_string(float_format=lambda x: f"{x: .4f}"))
 
-    print("\n[4/4] Saving results ...")
-    port.to_parquet(OUT_PATH)
-    print(f"      portfolio returns -> {OUT_PATH}")
+    # ---------- Monthly backtest ----------
+    print("\n[3/6] Monthly backtest (month-end yields, annual weights) ...")
+    ym_month = monthly_yield_matrix(panel, ym, model, START_YEAR, END_YEAR)
+    rets_m = monthly_returns_from_yields(ym_month)
+    wdf_m = map_annual_weights_to_months(wdf, rets_m.index)
+    port_m = portfolio_monthly_returns(rets_m, wdf_m)
+    mm = monthly_metrics(port_m, benchmark_col=BENCHMARK)
+    print("\n=== Monthly portfolio metrics (annualized) ===")
+    print(mm.to_string(float_format=lambda x: f"{x: .4f}"))
 
+    print("\n=== Monthly significance vs benchmark ===")
+    stats_m = compare_portfolios(port_m, benchmark_col=BENCHMARK)
+    print(stats_m.to_string(float_format=lambda x: f"{x: .4f}"))
+    print("      (mean_ret_diff is per-month; multiply by 12 for annualized)")
+
+    # ---------- Fama-MacBeth ----------
+    print("\n[4/6] Fama-MacBeth: is the ESG score priced? ...")
+    fm = monthly_fama_macbeth(rets_m, panel)
+    if np.isfinite(fm.get("t_nw", np.nan)):
+        print(f"      months={fm['n_months']}, avg cross-section={fm['avg_cross_section']:.0f}")
+        print(f"      gamma(mean)={fm['gamma_mean']*10000:.2f}bp per unit ESG(0-100) per month")
+        print(f"      Newey-West t={fm['t_nw']:.3f}, two-sided p={fm['p']:.4f}")
+    else:
+        print(f"      insufficient months: {fm.get('n_months')}")
+
+    # ---------- Save ----------
+    print("\n[5/6] Saving outputs ...")
+    port.to_parquet(OUT_ANNUAL)
+    port_m.to_parquet(OUT_MONTHLY)
+    if "gamma_series" in fm:
+        fm["gamma_series"].to_frame("gamma").to_parquet(OUT_FM)
+
+    # ---------- Headlines ----------
+    print("\n[6/6] Headlines")
     bench_growth = (1 + port[BENCHMARK]).cumprod()
-    print("\nBenchmark growth of $1 (2013-2023):", f"{bench_growth.iloc[-1]:.3f}")
+    print(f"Annual  | benchmark growth ${bench_growth.iloc[-1]:.3f}, maxDD {max_drawdown(port[BENCHMARK]):.2%}")
     for col in [c for c in port.columns if c != BENCHMARK]:
         g = (1 + port[col]).cumprod().iloc[-1]
-        dd = max_drawdown(port[col])
-        print(f"{col}: growth ${g:.3f}, maxDD {dd:.2%}, CAGR {cagr(port[col]):.2%}")
+        print(f"Annual  | {col}: growth ${g:.3f}, maxDD {max_drawdown(port[col]):.2%}")
+    bm = port_m[BENCHMARK]
+    print(f"Monthly | benchmark: ann ret {(np.prod(1+bm.dropna())**(12/len(bm.dropna()))-1):.2%}, "
+          f"ann vol {bm.std(ddof=1)*np.sqrt(12):.2%}, maxDD {max_drawdown(bm):.2%}")
 
 
 if __name__ == "__main__":
