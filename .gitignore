@@ -40,3 +40,4 @@ app/node_modules/
 app/dist/
 app/.env
 npm-debug.log*
+.vercel
