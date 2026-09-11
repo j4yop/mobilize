@@ -114,6 +114,38 @@ export default function Methodology() {
         </Ul>
       </Section>
 
+      <Section title="Outcome Bond Lab (Rhino Bond) model">
+        <Ul>
+          <li>
+            <b>Deal terms</b>: all from the official World Bank press release (Mar 23, 2022) —
+            USD 150m, 5y, issue 94.84, no coupon, par redemption, GEF success-payment tiers
+            ($0/$36.69/$73.38/$91.73 per $1,000 on annualized rhino growth under 0% / 0–2% / 2–4% / over 4%).
+          </li>
+          <li>
+            <b>Population model</b>: geometric Brownian motion, annualized growth KPI over 5
+            years, 100k antithetic paths. Baseline drift 4%/yr (parks' reported recent growth),
+            vol 3%/yr — calibration is judgment, not fit to private data.
+          </li>
+          <li>
+            <b>Governance link</b>: drift shifts +0.5pp and vol scales −10% per 10 governance
+            points above 50. These elasticities are DISCLOSED ASSUMPTIONS — no public dataset
+            links country governance to conservation-outcome variance. The schedule is a
+            structuring illustration, not an empirical estimate.
+          </li>
+          <li>
+            <b>FX</b>: conservation payments ZAR 152m converted at 15.0 ZAR/USD (March 2022 rate).
+          </li>
+          <li>
+            <b>Vanilla comparison</b>: IBRD 5y USD area ~1.75% (Mar 2022 AAA curve, approximate).
+          </li>
+          <li>
+            Baseline drift sits at the tier-3 boundary (4%), so expected pricing is highly
+            drift-sensitive — see the drift table in the lab. The KPI definition (annualized
+            compound growth) is our interpretation of the official growth-rate metric.
+          </li>
+        </Ul>
+      </Section>
+
       <Section title="Reproduce">
         <p className="text-sm text-gray-600 dark:text-gray-300">
           <code>make data</code> → <code>python scripts/run_backtest.py</code> →{' '}

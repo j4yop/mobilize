@@ -3,12 +3,14 @@ import { useDashboardData, PORTFOLIO_META } from './hooks.js'
 import RiskLab from './components/RiskLab.jsx'
 import EsgMap from './components/EsgMap.jsx'
 import PricingTest from './components/PricingTest.jsx'
+import OutcomeLab from './components/OutcomeLab.jsx'
 import Methodology from './components/Methodology.jsx'
 
 const TABS = [
   { id: 'risk', label: 'Risk Lab' },
   { id: 'map', label: 'ESG Map' },
   { id: 'pricing', label: 'Pricing Test' },
+  { id: 'outcome', label: 'Outcome Bond Lab' },
   { id: 'method', label: 'Methodology' },
 ]
 
@@ -92,6 +94,7 @@ export default function App() {
         {tab === 'risk' && <RiskLab data={data} />}
         {tab === 'map' && <EsgMap data={data} />}
         {tab === 'pricing' && <PricingTest data={data} />}
+        {tab === 'outcome' && <OutcomeLab data={data} />}
         {tab === 'method' && <Methodology />}
       </main>
 

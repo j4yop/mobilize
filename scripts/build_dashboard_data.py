@@ -57,7 +57,6 @@ def main() -> None:
     annual = pd.read_parquet(DATA_DIR / "backtest_results.parquet")
     monthly = pd.read_parquet(DATA_DIR / "backtest_monthly.parquet")
     fm = pd.read_parquet(DATA_DIR / "fama_macbeth.parquet")
-
     # ---- 1. ESG panel (all years, for map + drilldown) ----
     panel_out = []
     for _, row in panel.iterrows():
@@ -189,6 +188,84 @@ def main() -> None:
         },
     }
 
+    # ---- 8. Rhino Bond outcome lab (M4) ----
+    outcome = None
+    sens = None
+    drift = None
+    zaf_gov = None
+    outcome_path = DATA_DIR / "outcome_bond.parquet"
+    if outcome_path.exists():
+        oc = pd.read_parquet(outcome_path)
+        base_row = oc[oc["scenario"] == "baseline"].iloc[0]
+        sa_row = oc[oc["scenario"] == "south_africa"]
+        sa_out = None
+        if len(sa_row):
+            r = sa_row.iloc[0]
+            sa_out = {
+                "expectedSuccessPer1000": round(float(r["expected_success_per_1000"]), 2),
+                "expectedAnnualReturn": round(float(r["expected_annual_return"]), 4),
+                "concessionPp": round(float(r["concession_pp"]), 2),
+                "pAnySuccess": round(float(r["p_any_success"]), 4),
+            }
+        outcome = {
+            "deal": {
+                "sizeUsd": 150_000_000,
+                "issuePrice": 0.9484,
+                "tenorYears": 5,
+                "maxSuccessUsd": 13_760_000,
+                "pricedDate": "2022-03-23",
+                "conservationZar": 152_000_000,
+                "conservationUsd": round(152e6 / 15.0 / 1e6, 1),
+                "successTiers": [
+                    {"upper": 0.0, "payment": 0.0},
+                    {"upper": 0.02, "payment": 36.69},
+                    {"upper": 0.04, "payment": 73.38},
+                    {"upper": None, "payment": 91.73},
+                ],
+            },
+            "baseline": {
+                "pFail": round(float(base_row["p_fail"]), 4),
+                "pTier1": round(float(base_row["p_tier1"]), 4),
+                "pTier2": round(float(base_row["p_tier2"]), 4),
+                "pTier3": round(float(base_row["p_tier3"]), 4),
+                "expectedSuccessPer1000": round(float(base_row["expected_success_per_1000"]), 2),
+                "expectedTotalSuccessUsd": round(float(base_row["expected_total_success_usd"]) / 1e6, 2),
+                "expectedAnnualReturn": round(float(base_row["expected_annual_return"]), 4),
+                "vanillaYield": round(float(base_row["vanilla_yield"]), 4),
+                "concessionPp": round(float(base_row["concession_pp"]), 2),
+                "donorExpectedOutlayUsd": round(float(base_row["donor_expected_outlay_usd"]) / 1e6, 2),
+                "conservationUsd": round(float(base_row["conservation_usd"]) / 1e6, 1),
+                "donorLeverage": round(float(base_row["donor_leverage"]), 2),
+            },
+            "southAfrica": sa_out,
+        }
+        sens_df = pd.read_parquet(DATA_DIR / "outcome_bond_sensitivity.parquet")
+        sens = [
+            {
+                "govScore": round(float(r["gov_score"]), 0),
+                "pSuccess": round(float(r["p_success"]), 4),
+                "requiredSuccessPer1000": round(float(r["required_success_per_1000"]), 2),
+                "concessionPp": round(float(r["concession_pp"]), 2),
+            }
+            for _, r in sens_df.iterrows()
+        ]
+        drift_df = pd.read_parquet(DATA_DIR / "outcome_bond_drift.parquet")
+        drift = [
+            {
+                "drift": round(float(r["drift"]), 3),
+                "pTier3": round(float(r["p_tier3"]), 4),
+                "expectedSuccessPer1000": round(float(r["expected_success_per_1000"]), 2),
+                "expectedAnnualReturn": round(float(r["expected_annual_return"]), 4),
+                "concessionPp": round(float(r["concession_pp"]), 2),
+                "donorLeverage": round(float(r["donor_leverage"]), 2),
+            }
+            for _, r in drift_df.iterrows()
+        ]
+        # South Africa governance from our panel for the chart context
+        zaf = panel[(panel["iso3"] == "ZAF") & (panel["year"] == 2022)]
+        if len(zaf) and pd.notna(zaf["pillar_G"].iloc[0]):
+            zaf_gov = round(float(zaf["pillar_G"].iloc[0]), 1)
+
     bundle = {
         "meta": {
             "universe": 35,
@@ -216,6 +293,10 @@ def main() -> None:
         "significance": sig_to_records(sig_annual, "annual") + sig_to_records(sig_monthly, "monthly"),
         "famaMacbeth": fm_summary,
         "findings": findings,
+        "outcomeBond": outcome,
+        "outcomeSensitivity": sens,
+        "outcomeDrift": drift,
+        "zafGovernance": zaf_gov,
     }
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -225,6 +306,7 @@ def main() -> None:
     print(f"  panel rows: {len(panel_out)}")
     print(f"  portfolio series: {list(annual.columns)}")
     print(f"  fama-macbeth months: {fm_summary['nMonths']}")
+    print(f"  outcome bond lab: {'included' if outcome else 'MISSING (run scripts/run_outcome.py)'}")
 
 
 if __name__ == "__main__":

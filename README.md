@@ -18,7 +18,7 @@ Mobilize is a two-part quantitative research project inspired by the World Bank 
 | M2 | Portfolio construction + backtest + risk metrics | ✅ Done — results below |
 | M2.5 | Monthly frequency + Fama–MacBeth + calibrated spread model | ✅ Done — results below |
 | M3 | Static React dashboard (Vercel) + methodology disclosures | ✅ Done — [Live app](https://mobilize.vercel.app) (deploy via `vercel`) |
-| M4 | Rhino Bond Monte Carlo pricing lab | ⏳ Planned |
+| M4 | Rhino Bond Monte Carlo pricing lab | ✅ Done — results below |
 
 ## M2 Results (2013–2023, 35 sovereigns, year-end yields, ~10Y duration)
 
@@ -68,6 +68,25 @@ Mobilize is a two-part quantitative research project inspired by the World Bank 
 - **FRED** (`fredgraph.csv`, keyless) — US Treasury yield curve for bond-return proxies & pricing
 
 All proxy assumptions (e.g., sovereign bond returns proxied from yield data) are disclosed in the report's limitations section.
+
+## M4 Results — Wildlife Conservation Bond ("Rhino Bond") pricing lab
+
+Official deal terms (all public): USD 150m, 5y, issue 94.84, no coupon, par redemption, GEF success-payment tiers ($0/$36.69/$73.38/$91.73 per $1,000 on annualized rhino growth). Monte Carlo: 100k antithetic GBM paths (4%/yr drift baseline, 3% vol).
+
+| Metric | Baseline | With SA governance (38/100) |
+|---|---|---|
+| E[success payment] | $80.11/$1k ($12.0m) | $73.40/$1k ($11.0m) |
+| P(any success) | 99.9% | 99.3% |
+| Investor E[return] | 2.63%/yr | 2.51%/yr |
+| Premium vs vanilla IBRD (1.75%) | +0.88pp | +0.76pp |
+| Donor leverage (conservation $ / expected subsidy $) | 1.4x | — |
+
+**Findings:**
+- At the parks' reported growth track (~4%/yr), the bond's tiered success payments imply a **positive investor premium** over the vanilla IBRD yield — the issue discount plus expected success payment outweighs the forgone coupon.
+- Pricing is **hyper-sensitive to the drift assumption** (it sits on the tier-3 boundary): at 2%/yr drift the premium nearly vanishes (0.37pp), at 6% it reaches 1.08pp. The drift table ships in the app.
+- **Governance success premium** (novel): holding investor economics fixed, the required donor success payment spans $80–$87/$1,000 as governance scores range 90→10 — weak institutions must be compensated ~9% more per $1,000. South Africa (38/100) sits toward the risky end.
+
+*Methodological notes: GBM population model with annualized-growth KPI (our interpretation of the official metric); drift/vol are disclosed judgment calibrations; governance elasticities are illustrative structuring assumptions, not fitted values; FX at 15.0 ZAR/USD (Mar 2022). All in the app's Methodology tab.*
 
 ## Stack
 
