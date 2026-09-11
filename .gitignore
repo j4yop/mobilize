@@ -34,3 +34,9 @@ data/processed/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Node / app
+app/node_modules/
+app/dist/
+app/.env
+npm-debug.log*

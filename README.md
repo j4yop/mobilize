@@ -17,7 +17,7 @@ Mobilize is a two-part quantitative research project inspired by the World Bank 
 | M1 | Data pipeline + sovereign ESG scoring panel | ✅ Done — 420 country-years, 35/35 coverage, equal-vs-PCA rank corr ρ=0.94 |
 | M2 | Portfolio construction + backtest + risk metrics | ✅ Done — results below |
 | M2.5 | Monthly frequency + Fama–MacBeth + calibrated spread model | ✅ Done — results below |
-| M3 | Streamlit app (3 tabs) + 6–8 page research report + deploy | ⏳ Planned |
+| M3 | Static React dashboard (Vercel) + methodology disclosures | ✅ Done — [Live app](https://mobilize.vercel.app) (deploy via `vercel`) |
 | M4 | Rhino Bond Monte Carlo pricing lab | ⏳ Planned |
 
 ## M2 Results (2013–2023, 35 sovereigns, year-end yields, ~10Y duration)
@@ -71,14 +71,23 @@ All proxy assumptions (e.g., sovereign bond returns proxied from yield data) are
 
 ## Stack
 
-Python 3.11+ · pandas · numpy · scipy · statsmodels · scikit-learn (PCA) · Streamlit · Plotly · pytest · ruff
+Python 3.11+ · pandas · numpy · scipy · pytest · ruff — analysis
+React 18 · Vite · Tailwind CSS 4 · Recharts — dashboard (fully static, no server)
 
 ## Usage
 
 ```bash
+# Analysis
 pip install -e ".[dev]"
-make data          # build the cached indicator panel + ESG scores
-pytest             # run the test suite
+make data                            # fetch WB indicators -> ESG score panel
+python scripts/run_backtest.py      # annual + monthly backtests + Fama-MacBeth
+python scripts/build_dashboard_data.py  # export static JSON bundle
+
+# Dashboard (app/)
+cd app && npm install
+npm run dev      # local dev server
+npm run build    # static build -> dist/
+vercel           # deploy from repo root (vercel.json config included)
 ```
 
 ## Repository layout
@@ -87,14 +96,13 @@ pytest             # run the test suite
 src/
   data/       WB + FRED clients, cleaning, caching
   scoring/    pillar normalization, composite + PCA scores
-  portfolio/  universe, benchmark/tilted/screened, rebalancing   (M2)
-  backtest/   returns engine, drawdown/VaR/CVaR metrics          (M2)
+  portfolio/  universe, benchmark/tilted/screened, rebalancing
+  backtest/   returns, metrics, significance, yields, monthly, Fama-MacBeth
   outcome/    rhino bond cash-flows, Monte Carlo, pricing        (M4)
-  viz/        chart builders                                     (M3)
-app/          Streamlit app                                      (M3)
-report/       research write-up                                  (M3)
-tests/
-notebooks/    report figures only
+app/          static React dashboard (Vercel-ready)
+scripts/      pipeline entry points
+tests/        46 passing tests
+data/         cached panels (gitignored, reproducible)
 ```
 
 ## License
