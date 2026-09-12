@@ -125,12 +125,39 @@ def main() -> None:
     else:
         print(f"      insufficient months: {fm.get('n_months')}")
 
+    # Pillar-level Fama-MacBeth (does the composite null hide pillar effects?)
+    fm_pillars = {}
+    for pillar_col, label in (("pillar_E", "E"), ("pillar_S", "S"), ("pillar_G", "G")):
+        fm_p = monthly_fama_macbeth(rets_m, panel, score_col=pillar_col)
+        if np.isfinite(fm_p.get("t_nw", np.nan)):
+            fm_pillars[label] = fm_p
+            print(f"      pillar {label}: gamma={fm_p['gamma_mean']*10000:6.2f}bp, "
+                  f"NW t={fm_p['t_nw']:5.2f}, p={fm_p['p']:.3f}")
+        else:
+            print(f"      pillar {label}: insufficient months ({fm_p.get('n_months')})")
+
     # ---------- Save ----------
     print("\n[5/6] Saving outputs ...")
     port.to_parquet(OUT_ANNUAL)
     port_m.to_parquet(OUT_MONTHLY)
+    rets_m.to_parquet(DATA_DIR / "processed" / "country_returns_monthly.parquet")
     if "gamma_series" in fm:
         fm["gamma_series"].to_frame("gamma").to_parquet(OUT_FM)
+    pillar_rows = []
+    for label, fm_p in fm_pillars.items():
+        pillar_rows.append(
+            {
+                "pillar": label,
+                "n_months": fm_p["n_months"],
+                "gamma_mean": fm_p["gamma_mean"],
+                "gamma_se": fm_p["gamma_se"],
+                "t_nw": fm_p["t_nw"],
+                "p": fm_p["p"],
+                "avg_cross_section": fm_p["avg_cross_section"],
+            }
+        )
+    if pillar_rows:
+        pd.DataFrame(pillar_rows).to_parquet(OUT_FM.with_name("fama_macbeth_pillars.parquet"))
 
     # ---------- Headlines ----------
     print("\n[6/6] Headlines")

@@ -25,7 +25,7 @@ from mobilize.backtest.metrics import (  # noqa: E402
 )
 from mobilize.backtest.monthly import monthly_metrics  # noqa: E402
 from mobilize.backtest.significance import compare_portfolios  # noqa: E402
-from mobilize.data.indicators import COUNTRIES  # noqa: E402
+from mobilize.data.indicators import COUNTRIES, INDICATORS  # noqa: E402
 from mobilize.portfolio.construction import (  # noqa: E402
     BENCHMARK,
     composition_summary,
@@ -58,20 +58,49 @@ def main() -> None:
     monthly = pd.read_parquet(DATA_DIR / "backtest_monthly.parquet")
     fm = pd.read_parquet(DATA_DIR / "fama_macbeth.parquet")
     # ---- 1. ESG panel (all years, for map + drilldown) ----
+    # Indicator-level columns (scored indicators only, for the drilldown).
+    scored_indicators = {
+        code: meta
+        for code, meta in INDICATORS.items()
+        if meta.get("direction", 0) != 0
+    }
+    indicator_cols = [c for c in panel.columns if c in scored_indicators]
+
     panel_out = []
     for _, row in panel.iterrows():
-        panel_out.append(
-            {
-                "iso3": row["iso3"],
-                "country": COUNTRIES.get(row["iso3"], row["iso3"]),
-                "year": int(row["year"]),
-                "scoreEqual": None if pd.isna(row.get("score_equal")) else round(float(row["score_equal"]), 1),
-                "scorePca": None if pd.isna(row.get("score_pca")) else round(float(row["score_pca"]), 1),
-                "pillarE": None if pd.isna(row.get("pillar_E")) else round(float(row["pillar_E"]), 1),
-                "pillarS": None if pd.isna(row.get("pillar_S")) else round(float(row["pillar_S"]), 1),
-                "pillarG": None if pd.isna(row.get("pillar_G")) else round(float(row["pillar_G"]), 1),
-            }
-        )
+        rec = {
+            "iso3": row["iso3"],
+            "country": COUNTRIES.get(row["iso3"], row["iso3"]),
+            "year": int(row["year"]),
+            "scoreEqual": None if pd.isna(row.get("score_equal")) else round(float(row["score_equal"]), 1),
+            "scorePca": None if pd.isna(row.get("score_pca")) else round(float(row["score_pca"]), 1),
+            "pillarE": None if pd.isna(row.get("pillar_E")) else round(float(row["pillar_E"]), 1),
+            "pillarS": None if pd.isna(row.get("pillar_S")) else round(float(row["pillar_S"]), 1),
+            "pillarG": None if pd.isna(row.get("pillar_G")) else round(float(row["pillar_G"]), 1),
+            # normalized indicator values (0-1 after direction + min-max), F3
+            "indicators": (
+                {
+                    code: (
+                        None
+                        if c not in row or pd.isna(row[c])
+                        else round(float(row[c]), 3)
+                    )
+                    for code, c in zip(indicator_cols, indicator_cols, strict=False)
+                }
+                if indicator_cols
+                else None
+            ),
+        }
+        # zip() above would pair with itself; build the dict directly instead
+        rec["indicators"] = {
+            code: (
+                None
+                if code not in row.index or pd.isna(row[code])
+                else round(float(row[code]), 3)
+            )
+            for code in indicator_cols
+        }
+        panel_out.append(rec)
 
     # ---- 2. Annual + monthly metrics ----
     annual_metrics = summary_table(annual, benchmark_col=BENCHMARK)
@@ -266,14 +295,62 @@ def main() -> None:
         if len(zaf) and pd.notna(zaf["pillar_G"].iloc[0]):
             zaf_gov = round(float(zaf["pillar_G"].iloc[0]), 1)
 
+    # ---- 8b. Pillar-level Fama-MacBeth (F4) ----
+    fm_pillars_out = None
+    fm_pillars_path = DATA_DIR / "fama_macbeth_pillars.parquet"
+    if fm_pillars_path.exists():
+        fmp = pd.read_parquet(fm_pillars_path)
+        fm_pillars_out = [
+            {
+                "pillar": r["pillar"],
+                "nMonths": int(r["n_months"]),
+                "gammaMean": round(float(r["gamma_mean"]), 6),
+                "tNeweyWest": round(float(r["t_nw"]), 3),
+                "pValue": round(float(r["p"]), 4),
+                "avgCrossSection": round(float(r["avg_cross_section"]), 1),
+            }
+            for _, r in fmp.iterrows()
+        ]
+
+    # ---- 8c. IBRD outcome-bond family (F2) ----
+    bond_family_out = None
+    family_path = DATA_DIR / "outcome_bond_family.parquet"
+    if family_path.exists():
+        fam = pd.read_parquet(family_path)
+        bond_family_out = [
+            {
+                "key": r["key"],
+                "name": r["name"],
+                "sizeUsd": round(float(r["size_usd"]), 0),
+                "tenorYears": float(r["tenor_years"]),
+                "maturity": r["maturity"],
+                "guaranteedReturn": round(float(r["guaranteed_return"]), 4),
+                "maxTotalReturn": round(float(r["max_total_return"]), 4),
+                "outcomeSpreadPp": round(float(r["outcome_spread_pp"]), 2),
+                "outcomeUnit": r["outcome_unit"],
+                "outcomePayer": r["outcome_payer"],
+                "country": r["country"],
+                "theme": r["theme"],
+                "structure": r["structure"],
+                "variableNote": r["variable_note"],
+                "principalProtected": bool(r["principal_protected"]),
+                "url": r["url"],
+            }
+            for _, r in fam.iterrows()
+        ]
+
     bundle = {
         "meta": {
             "universe": 35,
-            "window": "2013-2023",
+            "window": f"{panel['year'].min() + 1}-{panel['year'].max()}",
             "benchmark": BENCHMARK,
             "portfolios": sorted(annual.columns.tolist()),
             "latestWeightsYear": latest_year,
             "generated": pd.Timestamp.now().isoformat(),
+            "indicatorMeta": {
+                code: {"name": meta["name"], "pillar": meta["pillar"]}
+                for code, meta in scored_indicators.items()
+            },
         },
         "panel": panel_out,
         "metrics": metrics_to_records(annual_metrics, "annual")
@@ -292,10 +369,12 @@ def main() -> None:
         ],
         "significance": sig_to_records(sig_annual, "annual") + sig_to_records(sig_monthly, "monthly"),
         "famaMacbeth": fm_summary,
+        "famaMacbethPillars": fm_pillars_out,
         "findings": findings,
         "outcomeBond": outcome,
         "outcomeSensitivity": sens,
         "outcomeDrift": drift,
+        "outcomeBondFamily": bond_family_out,
         "zafGovernance": zaf_gov,
     }
 

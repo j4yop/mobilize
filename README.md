@@ -12,13 +12,14 @@ Mobilize is a two-part quantitative research project inspired by the World Bank 
 
 ## Status
 
-| Milestone | Scope | Status |
-|---|---|---|
-| M1 | Data pipeline + sovereign ESG scoring panel | ✅ Done — 420 country-years, 35/35 coverage, equal-vs-PCA rank corr ρ=0.94 |
+| Milestone | Scope | Status | Note |
+|---|---|---|---|
+| M1 | Data pipeline + sovereign ESG scoring panel | ✅ Done — 455 country-years (2012–2024), 35/35 coverage, equal-vs-PCA rank corr ρ=0.94 |
 | M2 | Portfolio construction + backtest + risk metrics | ✅ Done — results below |
 | M2.5 | Monthly frequency + Fama–MacBeth + calibrated spread model | ✅ Done — results below |
 | M3 | Static React dashboard (Vercel) + methodology disclosures | ✅ Done — [Live app](https://mobilize.vercel.app) (deploy via `vercel`) |
 | M4 | Rhino Bond Monte Carlo pricing lab | ✅ Done — results below |
+| M5 | 2024 data window + pillar-level Fama–MacBeth + indicator drilldown + IBRD outcome-bond family + CSV export & deep-linking | ✅ Done — see below |
 
 ## M2 Results (2013–2023, 35 sovereigns, year-end yields, ~10Y duration)
 
@@ -61,6 +62,14 @@ Mobilize is a two-part quantitative research project inspired by the World Bank 
 **Headline (the defensible version):** *In this 35-country backtest, ESG integration acted as a significant volatility reducer (~0.7pp) at no statistically significant return cost, but provided no drawdown protection and no evidence of ESG being priced into sovereign returns.* This nuance — not "ESG wins" or "ESG loses" — is exactly the kind of result the World Bank Treasury's own Sustainable Fixed-Income Strategy research engages with.
 
 *Methodological notes: bond returns proxied via duration×Δyield with full duration against each period's yield move (D=8, ~10Y benchmark tenor). DM yields observed (FRED: US DGS10 + OECD long-term monthly). EM yields = observed US 10Y + sign-constrained model-fitted annual spread (calibrated on DM observed spreads, R² reported; debt/GDP backfilled from nearest available year within country). EM monthly yields inherit observed US curve dynamics; EM-specific monthly variation is macro-only — disclosed. Scores annual, no look-ahead: year-t weights use year-(t-1) information. Fama–MacBeth: monthly cross-sectional regressions with Newey–West corrected t-stats.*
+
+## M5 Results — 2024 window, pillar pricing, and the outcome-bond family
+
+- **Data window extended to 2024** (455 country-years; findings robust): monthly backtest now spans 143 months. ESG tilt vol reduction ~0.8pp (p<0.001), return cost still not significant, max drawdowns unchanged. *Caveat disclosed: 2024's Environmental pillar drops two not-yet-published indicators (renewables, resource depletion) — see Methodology tab.*
+- **Pillar-level Fama–MacBeth** (new): the composite "not priced" null is NOT an aggregation artifact — none of E (t=−0.18, p=0.86), S (t=−0.41, p=0.68), G (t=−0.85, p=0.40) is individually priced either.
+- **Indicator-level drilldown** (new): every country-year in the dashboard exposes all 16 normalized indicators behind its score.
+- **IBRD outcome-bond family** (new): all seven official outcome bonds compared (Rhino, Clean Cooking $200M/KliK, Amazon $225M/Microsoft, Plastic $100M, Vietnam ER $50M, Spekboom $120M/Amazon, UNICEF CAR-129) — guaranteed floors vs official maximum returns, offtake partners and structures.
+- **CSV export + URL deep-linking** (new): download the full 455-row panel as CSV; share any view via `#tab=map&year=2021&country=ZAF`.
 
 ## Data sources (100% free, no API keys required)
 

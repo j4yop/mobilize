@@ -231,3 +231,75 @@ def governance_sensitivity(
             }
         )
     return out
+
+
+def outcome_bond_comparisons() -> list[dict]:
+    """Static comparison table of all seven IBRD outcome bonds.
+
+    Returns per-bond: guaranteed return, maximum potential return, and the
+    outcome-linked spread (max - min), computed from the official terms in
+    mobilize.outcome.terms. Used by the dashboard's bond-family tab.
+    """
+    from mobilize.outcome.terms import (
+        ALL_BONDS,
+        CapitalAtRiskTerms,
+        DiscountLinkedTerms,
+        OutcomeBondTerms,
+        RhinoBondTerms,
+    )
+
+    rows: list[dict] = []
+    for key, b in ALL_BONDS.items():
+        if isinstance(b, RhinoBondTerms):
+            # Rhino: guaranteed return comes from the issue discount only;
+            # max return = discount + full tier-3 success payment
+            guaranteed = (1_000.0 / (b.issue_price * 1_000.0)) ** (1 / b.tenor_years) - 1
+            max_total = (
+                (1_000.0 + b.success_tiers[-1][1])
+                / (b.issue_price * 1_000.0)
+            ) ** (1 / b.tenor_years) - 1
+            variable_note = "GEF success payment at maturity ($0-$91.73/$1k, tiered)"
+            structure = "discount + terminal success payment"
+        elif isinstance(b, DiscountLinkedTerms):
+            guaranteed = (1_000.0 / (b.issue_price * 1_000.0)) ** (1 / b.tenor_years) - 1
+            max_total = b.max_total_return
+            variable_note = f"semi-annual {b.outcome_unit} linked coupons (capped)"
+            structure = "discount + capped variable coupons"
+        elif isinstance(b, OutcomeBondTerms):
+            guaranteed = b.fixed_coupon
+            max_total = b.max_total_return
+            variable_note = f"annual {b.outcome_unit} linked interest"
+            structure = "par + fixed + outcome-linked coupon"
+        elif isinstance(b, CapitalAtRiskTerms):
+            guaranteed = b.fixed_coupon
+            max_total = b.fixed_coupon  # no upside; the risk is on principal
+            variable_note = (
+                f"repayment of {b.principal_at_risk_share:.0%} principal conditional on "
+                f"{b.outcome_unit.lower()}"
+            )
+            structure = "capital-at-risk note"
+        else:  # pragma: no cover
+            continue
+        rows.append(
+            {
+                "key": key,
+                "name": getattr(b, "name", "Wildlife Conservation (Rhino) Bond"),
+                "size_usd": float(b.size_usd),
+                "tenor_years": float(getattr(b, "tenor_years", 0)),
+                "maturity": getattr(b, "maturity", ""),
+                "guaranteed_return": float(guaranteed),
+                "max_total_return": float(max_total),
+                "outcome_spread_pp": float((max_total - guaranteed) * 100),
+                "outcome_unit": getattr(b, "outcome_unit", "rhino growth tiers"),
+                "outcome_payer": getattr(b, "outcome_payer", "GEF"),
+                "country": getattr(b, "country", "South Africa"),
+                "theme": getattr(b, "theme", "black rhino conservation"),
+                "structure": structure,
+                "variable_note": variable_note,
+                "principal_protected": False
+                if isinstance(b, CapitalAtRiskTerms)
+                else bool(getattr(b, "principal_protected", True)),
+                "url": getattr(b, "url", ""),
+            }
+        )
+    return rows

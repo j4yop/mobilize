@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDashboardData, PORTFOLIO_META } from './hooks.js'
 import RiskLab from './components/RiskLab.jsx'
 import EsgMap from './components/EsgMap.jsx'
@@ -14,10 +14,62 @@ const TABS = [
   { id: 'method', label: 'Methodology' },
 ]
 
+// ---- URL hash deep-linking: #tab=map&year=2021&country=ZAF ----
+function readHash() {
+  const raw = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  const out = {}
+  for (const k of ['tab', 'year', 'country']) {
+    const v = raw.get(k)
+    if (v) out[k] = v
+  }
+  return out
+}
+
+function writeHash(state) {
+  const params = new URLSearchParams()
+  if (state.tab && state.tab !== 'risk') params.set('tab', state.tab)
+  if (state.year) params.set('year', String(state.year))
+  if (state.country) params.set('country', state.country)
+  const hash = params.toString()
+  const url = `${window.location.pathname}${window.location.search}${hash ? `#${hash}` : ''}`
+  window.history.replaceState(null, '', url)
+}
+
 export default function App() {
   const { data, error } = useDashboardData()
-  const [tab, setTab] = useState('risk')
+  const initial = useRef(readHash())
+  const [tab, setTab] = useState(() => {
+    const t = initial.current.tab
+    return TABS.some((x) => x.id === t) ? t : 'risk'
+  })
+  const [deepLink, setDeepLink] = useState(() => {
+    const s = initial.current
+    return { year: s.year ? Number(s.year) : null, country: s.country ?? null }
+  })
   const tabsRef = useRef({})
+
+  // Sync tab changes into the URL
+  useEffect(() => {
+    writeHash({ tab, year: deepLink.year, country: deepLink.country })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
+
+  // Respond to browser back/forward on the hash
+  useEffect(() => {
+    const onHashChange = () => {
+      const h = readHash()
+      if (h.tab && TABS.some((x) => x.id === h.tab)) setTab(h.tab)
+      setDeepLink({ year: h.year ? Number(h.year) : null, country: h.country ?? null })
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
+  // Clear country/year deep-link state when leaving the map tab
+  const onTabChange = (id) => {
+    setTab(id)
+    if (id !== 'map') setDeepLink({ year: null, country: null })
+  }
 
   const onTabKeyDown = (e, i) => {
     let next = null
@@ -27,7 +79,7 @@ export default function App() {
     else if (e.key === 'End') next = TABS.length - 1
     if (next !== null) {
       e.preventDefault()
-      setTab(TABS[next].id)
+      onTabChange(TABS[next].id)
       tabsRef.current[TABS[next].id]?.focus()
     }
   }
@@ -66,7 +118,7 @@ export default function App() {
                   aria-selected={selected}
                   aria-controls={`panel-${t.id}`}
                   tabIndex={selected ? 0 : -1}
-                  onClick={() => setTab(t.id)}
+                  onClick={() => onTabChange(t.id)}
                   onKeyDown={(e) => onTabKeyDown(e, i)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     selected
@@ -116,7 +168,13 @@ export default function App() {
         </div>
 
         {tab === 'risk' && <RiskLab data={data} />}
-        {tab === 'map' && <EsgMap data={data} />}
+        {tab === 'map' && (
+          <EsgMap
+            data={data}
+            initialYear={deepLink.year}
+            initialCountry={deepLink.country}
+          />
+        )}
         {tab === 'pricing' && <PricingTest data={data} />}
         {tab === 'outcome' && <OutcomeLab data={data} />}
         {tab === 'method' && <Methodology />}

@@ -188,6 +188,74 @@ export default function OutcomeLab({ data }) {
         </ResponsiveContainer>
       </div>
 
+      {/* IBRD outcome-bond family */}
+      {data.outcomeBondFamily && data.outcomeBondFamily.length > 0 && (
+        <div className="card overflow-x-auto">
+          <h3 className="font-semibold mb-1">The IBRD outcome-bond family (all seven, official terms)</h3>
+          <p className="text-sm text-gray-500 mb-3">
+            The Rhino Bond pioneered the structure in 2022; six more outcome bonds
+            followed. All transfer project performance risk to investors via
+            outcome-linked coupons or success payments — funded not by donors but by
+            credit sales (ITMOs, CRUs, VCUs, plastic credits) with corporate offtakers.
+          </p>
+          <table className="w-full text-sm" aria-label="IBRD outcome bond family comparison">
+            <thead>
+              <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                <th scope="col" className="py-2 pr-4 font-medium">Bond</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Size</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Tenor</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Min ret</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Max ret</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Outcome unit</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Offtake partner</th>
+                <th scope="col" className="py-2 font-medium">Structure</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.outcomeBondFamily.map((b) => (
+                <tr
+                  key={b.key}
+                  className={`border-b border-gray-100 dark:border-gray-800 ${
+                    b.key === 'rhino' ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+                  }`}
+                >
+                  <td className="py-2 pr-4">
+                    {b.url ? (
+                      <a href={b.url} target="_blank" rel="noreferrer" className="text-blue-700 dark:text-blue-300 hover:underline">
+                        {b.name}
+                      </a>
+                    ) : (
+                      b.name
+                    )}
+                    <div className="text-xs text-gray-500">{b.country} · {b.theme}</div>
+                  </td>
+                  <td className="py-2 pr-4 font-mono">${fmtNum(b.sizeUsd / 1e6, 0)}m</td>
+                  <td className="py-2 pr-4 font-mono">{fmtNum(b.tenorYears, 1)}y</td>
+                  <td className="py-2 pr-4 font-mono">{fmtPct(b.guaranteedReturn)}</td>
+                  <td className="py-2 pr-4 font-mono">{fmtPct(b.maxTotalReturn)}</td>
+                  <td className="py-2 pr-4 text-xs">{b.outcomeUnit}</td>
+                  <td className="py-2 pr-4 text-xs">{b.outcomePayer}</td>
+                  <td className="py-2 text-xs">
+                    {b.structure}
+                    {!b.principalProtected && (
+                      <span className="ml-1 text-red-700 dark:text-red-400 font-semibold" title="50% of principal was conditional on donation receipts">
+                        ⚠ principal at risk
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-xs text-gray-500 mt-2">
+            Min ret = guaranteed floor (fixed coupon or issue discount); Max ret = official
+            maximum potential return from the World Bank Q&amp;A documents. The Rhino Bond's
+            range spans the GEF success tiers; the UNICEF note's principal (50%) was
+            conditional on donation receipts — the only capital-at-risk structure in the family.
+          </p>
+        </div>
+      )}
+
       <p className="text-xs text-gray-400 max-w-3xl">
         Model: GBM rhino population (annualized growth KPI), antithetic 100k paths. Deal terms from
         the official World Bank press release (all public). Drift/vol calibrated to the parks'

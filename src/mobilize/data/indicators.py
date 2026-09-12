@@ -156,7 +156,7 @@ FRED_CURVE_SERIES: dict[str, str] = {
 # rebalance (for FY2013) can use Dec-2012 data without look-ahead.
 PANEL_START_YEAR: int = 2012
 START_YEAR: int = 2013
-END_YEAR: int = 2023
+END_YEAR: int = 2024
 
 # Portfolio construction parameters.
 REBALANCE_MONTH: int = 12  # scores observed at end of December
