@@ -24,8 +24,14 @@ import pandas as pd
 NW_LAGS_FRAC = 0.1  # Newey-West lag length = ~10% of the sample (common rule of thumb)
 
 
-def score_asof(panel: pd.DataFrame, iso3: str, period_year: int, period_month: int) -> float | None:
-    """ESG score observable before the period starts.
+def score_asof(
+    panel: pd.DataFrame,
+    iso3: str,
+    period_year: int,
+    period_month: int,
+    score_col: str = "score_equal",
+) -> float | None:
+    """Score observable before the period starts.
 
     For months Jan-Sep of year t: latest score is year t-1 (published with
     a lag). For Oct-Dec: also year t-1 (annual data, conservative).
@@ -33,8 +39,11 @@ def score_asof(panel: pd.DataFrame, iso3: str, period_year: int, period_month: i
     hist = panel[(panel["iso3"] == iso3) & (panel["year"] <= period_year - 1)]
     if hist.empty:
         return None
-    row = hist.dropna(subset=["score_equal"]).sort_values("year").iloc[-1]
-    return float(row["score_equal"])
+    hist = hist.dropna(subset=[score_col])
+    if hist.empty:
+        return None
+    row = hist.sort_values("year").iloc[-1]
+    return float(row[score_col])
 
 
 def monthly_fama_macbeth(
@@ -58,7 +67,7 @@ def monthly_fama_macbeth(
             continue
         scores = {}
         for iso3 in r.index:
-            s = score_asof(panel, iso3, yr, month.month)
+            s = score_asof(panel, iso3, yr, month.month, score_col=score_col)
             if s is not None:
                 scores[iso3] = s
         common = [i for i in r.index if i in scores]

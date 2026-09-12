@@ -18,6 +18,7 @@ from mobilize.outcome.monte_carlo import (  # noqa: E402
     RhinoMCConfig,
     drift_sensitivity,
     governance_sensitivity,
+    outcome_bond_comparisons,
     price_wcb,
 )
 from mobilize.outcome.terms import RhinoBondTerms, wcb_cashflows  # noqa: E402
@@ -82,6 +83,19 @@ def main() -> None:
             f"      ${r.required_success_per_1000:6.2f}       |   {r.concession_pp:5.2f}"
         )
 
+    # ---- Outcome-bond family comparison (all 7 IBRD outcome bonds) ----
+    print("\n[5/5] IBRD outcome-bond family (official terms) ...")
+    family = outcome_bond_comparisons()
+    fam_df = pd.DataFrame(family)
+    print("\nBond | Size | Tenor | Min ret | Max ret | Outcome | Payer")
+    print("-" * 100)
+    for _, r in fam_df.iterrows():
+        print(
+            f"  {r['name'][:36]:36s} | ${r.size_usd/1e6:5.0f}m | {r.tenor_years:4.1f}y"
+            f" | {r.guaranteed_return:6.2%} | {r.max_total_return:6.2%}"
+            f" | {str(r.outcome_unit)[:24]:24s} | {r.outcome_payer}"
+        )
+
     # ---- Cash-flow envelope sanity ----
     print("\nCash-flow envelope per $1,000:")
     for x in (0.0, 0.01, 0.03, 0.05):
@@ -105,7 +119,8 @@ def main() -> None:
     scenarios.to_parquet(OUT_PATH)
     sens_df.to_parquet(OUT_PATH.with_name("outcome_bond_sensitivity.parquet"))
     drift_df.to_parquet(OUT_PATH.with_name("outcome_bond_drift.parquet"))
-    print(f"\nSaved: {OUT_PATH} and sensitivity schedule")
+    fam_df.to_parquet(OUT_PATH.with_name("outcome_bond_family.parquet"))
+    print(f"\nSaved: {OUT_PATH} and sensitivity schedule + bond family")
 
     # headline interpretation
     print("\n" + "=" * 70)

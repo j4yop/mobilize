@@ -85,8 +85,11 @@ def composite_pca(
     def _year_pca(g: pd.DataFrame) -> pd.Series:
         # Impute missing indicators with the year's cross-sectional median
         # (standard PCA practice) instead of dropping incomplete countries.
+        # Indicators with no data in the year's cross-section are dropped
+        # (their median is NaN, which would propagate through the SVD).
         X_df = g[value_cols].copy()
-        if len(X_df) < 5:
+        X_df = X_df.dropna(axis=1, how="all")
+        if len(X_df) < 5 or X_df.shape[1] < 2:
             return pd.Series(np.nan, index=g.index)
         medians = X_df.median()
         X_df = X_df.fillna(medians)

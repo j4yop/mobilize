@@ -58,8 +58,8 @@ check('Significance table has 2 strategy rows', sigRows === 2, `${sigRows} rows`
 await page.click('nav button:has-text("ESG Map")')
 await page.waitForTimeout(400)
 check('ESG Map renders', await page.locator('svg circle').count() >= 35)
-const avg2023 = await page.locator('text=/Universe average — 2023/').count()
-check('Universe average banner shows 2023', avg2023 === 1)
+const avg2024 = await page.locator('text=/Universe average — 2024/').count()
+check('Universe average banner shows 2024 (latest)', avg2024 === 1)
 await page.selectOption('select', '2015')
 await page.waitForTimeout(400)
 const avg2015 = await page.locator('text=/Universe average — 2015/').count()
@@ -127,9 +127,9 @@ const bundle = await page.evaluate(async () => {
   return r.ok ? await r.json() : null
 })
 check('dashboard.json fetches OK', bundle !== null)
-check('Bundle has all 13 sections', Object.keys(bundle).length === 13, Object.keys(bundle).join(','))
-check('Panel has 420 rows', bundle.panel.length === 420)
-check('No null scores in latest year', bundle.panel.filter(r => r.year === 2023 && r.scoreEqual === null).length === 0)
+check('Bundle has all 15 sections', Object.keys(bundle).length === 15, Object.keys(bundle).join(','))
+check('Panel has 455 rows (2012-2024)', bundle.panel.length === 455)
+check('No null scores in latest year', bundle.panel.filter(r => r.year === 2024 && r.scoreEqual === null).length === 0)
 
 // keyboard navigation: tab through nav buttons
 await page.click('nav button:has-text("Risk Lab")')
@@ -143,7 +143,65 @@ check('Nav buttons focusable (keyboard)', focusWorked)
 check('Zero console/page/request errors (desktop)', errors.length === 0, errors.slice(0, 3).join(' | '))
 check('Zero console/page errors (mobile)', mErrors.length === 0, mErrors.slice(0, 3).join(' | '))
 
-// --- Accessibility checks (post-fix) ---
+// --- New features (F1-F5) ---
+await page.click('nav button:has-text("ESG Map")')
+await page.waitForTimeout(400)
+// F1: data window extends to 2024
+await page.selectOption('select#esg-year-select', '2024')
+await page.waitForTimeout(400)
+check('F1: year 2024 available & selectable', await page.locator('text=/Universe average — 2024/').count() === 1)
+const lastPanelYear = await page.evaluate(async () => {
+  const r = await fetch('data/dashboard.json'); const d = await r.json()
+  return Math.max(...d.panel.map((x) => x.year))
+})
+check('F1: bundle panel includes 2024', lastPanelYear === 2024, `last=${lastPanelYear}`)
+check('F1: meta.window shows 2013-2024', await page.locator('header p').first().innerText().then((t) => t.includes('2013-2024')))
+
+// F3: indicator drilldown
+await page.click('table tbody tr:has-text("Sweden")')
+await page.waitForTimeout(400)
+const detailsCount = await page.locator('details summary').count()
+check('F3: indicator drilldown toggle present', detailsCount === 1)
+await page.locator('details summary').click()
+await page.waitForTimeout(300)
+const indRows = await page.locator('details table tbody tr').count()
+check('F3: indicator table shows ~16 rows', indRows >= 14 && indRows <= 16, `${indRows}`)
+
+// F5: CSV export button
+check('F5: CSV export button present', await page.locator('button:has-text("Download panel (CSV)")').count() === 1)
+const csvDownload = page.waitForEvent('download', { timeout: 5000 }).catch(() => null)
+await page.click('button:has-text("Download panel (CSV)")')
+const dl = await csvDownload
+check('F5: CSV download triggers', dl !== null, dl ? dl.suggestedFilename() : 'no download event')
+
+// F5: deep-linking — reload with hash state
+await page.goto(BASE + '/#tab=map&year=2021&country=ZAF', { waitUntil: 'networkidle' })
+await page.locator('select#esg-year-select').waitFor({ timeout: 10000 })
+check('F5: hash restores map tab', await page.locator('h2:has-text("Sovereign ESG scores")').count() === 1)
+const sel2021 = await page.locator('text=/Universe average — 2021/').count()
+check('F5: hash restores year 2021', sel2021 === 1)
+check('F5: hash restores country ZAF', await page.locator('h3:has-text("South Africa")').count() === 1)
+const hashAfter = await page.evaluate(() => window.location.hash)
+check('F5: hash persists in URL', hashAfter.includes('year=2021') && hashAfter.includes('country=ZAF'), hashAfter)
+
+// F4: pillar-level FM table
+await page.click('nav button:has-text("Pricing Test")')
+await page.waitForTimeout(400)
+check('F4: pillar-level table present', await page.locator('text=/is any single pillar priced/').count() === 1)
+const pillarRows = await page.locator('table[aria-label*="Pillar-level"] tbody tr').count()
+check('F4: three pillar rows', pillarRows === 3, `${pillarRows}`)
+check('F4: verdicts rendered', await page.locator('text=not priced').count() >= 3)
+
+// F2: bond family table
+await page.click('nav button:has-text("Outcome Bond Lab")')
+await page.waitForTimeout(400)
+check('F2: bond family table present', await page.locator('text=/all seven, official terms/').count() === 1)
+const famRows = await page.locator('table[aria-label*="bond family"] tbody tr').count()
+check('F2: seven bonds listed', famRows === 7, `${famRows}`)
+for (const name of ['Clean Cooking', 'Amazon', 'Plastic', 'Spekboom', 'Emissions', 'UNICEF']) {
+  check(`F2: ${name} listed`, await page.locator(`text=${name}`).count() >= 1)
+}
+check('F2: rhino row highlighted', await page.locator('tr.bg-blue-50, tr.bg-blue-900\\/30').count() >= 1)
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 
 // ARIA tabs pattern

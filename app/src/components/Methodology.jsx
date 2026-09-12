@@ -24,9 +24,25 @@ export default function Methodology() {
             available year within country.
           </li>
           <li>
+            <b>2024 extension caveat</b>: for 2024, renewable-energy consumption and
+            natural-resource depletion are not yet published by the World Bank (latest
+            2021; &gt;2-year gaps cannot be interpolated), so the 2024 Environmental
+            pillar rests on the remaining indicators (CO₂, PM2.5 and freshwater carried
+            forward per the interpolation rule). This changes the E-pillar's composition
+            for 2024 and can shift E-pillar levels vs 2023 — disclosed, not hidden.
+          </li>
+          <li>
             <b>Yields</b>: DM (12 countries) observed — US 10Y CMT (FRED DGS10, daily) and
             OECD long-term government bond yields (FRED monthly, ~10Y tenor). EM yields
             synthetic — see below.
+          </li>
+          <li>
+            <b>Outcome-bond family</b>: terms for all seven IBRD outcome bonds (Rhino,
+            Clean Cooking, Amazon Reforestation, Plastic Waste, Emissions Reduction,
+            Spekboom, UNICEF) taken from official World Bank press releases and Treasury
+            Q&amp;A documents; minimum/maximum returns are the official disclosed figures,
+            not modeled. The Rhino Bond's governance sensitivity remains the only modeled
+            pricing lab.
           </li>
         </Ul>
       </Section>

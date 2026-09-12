@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { fmtNum } from '../hooks.js'
 
 // Country positions (approximate centroids) for the 35-country universe.
@@ -56,15 +56,70 @@ function RankArrow({ change }) {
   return <span aria-label={`down ${change} places`}>↓</span>
 }
 
-export default function EsgMap({ data }) {
+function exportPanelCsv(data) {
+  const cols = ['iso3', 'country', 'year', 'scoreEqual', 'scorePca', 'pillarE', 'pillarS', 'pillarG']
+  const lines = [cols.join(',')]
+  for (const r of data.panel) {
+    lines.push(
+      cols
+        .map((c) => {
+          const v = r[c]
+          if (v === null || v === undefined) return ''
+          return typeof v === 'string' && v.includes(',') ? `"${v}"` : v
+        })
+        .join(',')
+    )
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `mobilize-esg-panel-${data.meta.window.replace(/\//g, '')}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export default function EsgMap({ data, initialYear, initialCountry }) {
   const years = useMemo(() => {
     const ys = [...new Set(data.panel.map((r) => r.year))].sort()
     return ys
   }, [data])
-  const [year, setYear] = useState(Math.max(...years))
-  const [selected, setSelected] = useState(null)
+  const [year, setYear] = useState(() =>
+    initialYear && years.includes(initialYear) ? initialYear : Math.max(...years)
+  )
+  const [selected, setSelected] = useState(() =>
+    initialCountry && data.panel.some((r) => r.iso3 === initialCountry) ? initialCountry : null
+  )
+
+  // Follow deep-link prop changes (e.g. hashchange navigation without a reload)
+  useEffect(() => {
+    if (initialYear !== undefined && years.includes(initialYear)) setYear(initialYear)
+  }, [initialYear]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (initialCountry !== undefined) setSelected(initialCountry)
+  }, [initialCountry]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const dark = useDarkMode()
   const color = (score) => scoreColor(score, dark)
+
+  // Deep-link write-back: keep the URL in sync with year/country selection
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const currentTab = params.get('tab') ?? 'risk'
+    if (currentTab === 'map') {
+      if (year !== Math.max(...years)) params.set('year', String(year))
+      else params.delete('year')
+      if (selected) params.set('country', selected)
+      else params.delete('country')
+      const hash = params.toString()
+      window.history.replaceState(
+        null,
+        '',
+        `${window.location.pathname}${window.location.search}${hash ? `#${hash}` : ''}`
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, selected])
 
   const rows = useMemo(
     () => data.panel.filter((r) => r.year === year),
@@ -205,7 +260,15 @@ export default function EsgMap({ data }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Rankings */}
         <div className="card overflow-hidden">
-          <h3 className="font-semibold mb-2" id="rankings-heading">Rankings — {year}</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold" id="rankings-heading">Rankings — {year}</h3>
+            <button
+              onClick={() => exportPanelCsv(data)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300"
+            >
+              Download panel (CSV)
+            </button>
+          </div>
           <div className="max-h-96 overflow-y-auto">
             <table className="w-full text-sm" aria-labelledby="rankings-heading">
               <caption className="sr-only">
@@ -283,6 +346,14 @@ function CountryDetail({ data, iso3, row, color }) {
       : null
   const inTilt = (data.weights.esg_tilted?.[iso3] ?? 0) * 100
   const inBench = (data.weights.benchmark?.[iso3] ?? 0) * 100
+  const indicatorMeta = data.meta?.indicatorMeta ?? {}
+  const indicators = row.indicators ?? {}
+  const indicatorRows = Object.entries(indicators)
+    .map(([code, value]) => {
+      const meta = indicatorMeta[code] ?? {}
+      return { code, value, name: meta.name ?? code, pillar: meta.pillar ?? '' }
+    })
+    .sort((a, b) => a.pillar.localeCompare(b.pillar) || a.name.localeCompare(b.name))
 
   return (
     <div>
@@ -302,6 +373,37 @@ function CountryDetail({ data, iso3, row, color }) {
         <Pillar label="Governance" value={row.pillarG} color={color} />
       </div>
 
+      {indicatorRows.length > 0 && (
+        <details className="mb-4">
+          <summary className="text-sm text-blue-700 dark:text-blue-300 cursor-pointer select-none">
+            Show the {indicatorRows.length} indicators behind this score
+          </summary>
+          <table className="w-full text-xs mt-2" aria-label={`Indicator values for ${row.country}, ${row.year}`}>
+            <thead>
+              <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                <th scope="col" className="py-1 pr-2 font-medium">Indicator</th>
+                <th scope="col" className="py-1 pr-2 font-medium">Pillar</th>
+                <th scope="col" className="py-1 font-medium text-right">Normalized (0–1)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {indicatorRows.map((ind) => (
+                <tr key={ind.code} className="border-b border-gray-100 dark:border-gray-800">
+                  <td className="py-1 pr-2">{ind.name}</td>
+                  <td className="py-1 pr-2 text-gray-500">{ind.pillar}</td>
+                  <td className="py-1 text-right font-mono">
+                    {ind.value === null ? '—' : ind.value.toFixed(3)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[10px] text-gray-500 mt-1">
+            Direction-adjusted, min-max normalized per year. Missing = not published for this year.
+          </p>
+        </details>
+      )}
+
       <div className="text-sm space-y-1 mb-4">
         <div className="flex justify-between">
           <span className="text-gray-500">Benchmark weight ({data.meta.latestWeightsYear})</span>
@@ -315,21 +417,35 @@ function CountryDetail({ data, iso3, row, color }) {
 
       <div>
         <div className="text-sm text-gray-500 mb-1">Score history (equal-weight vs PCA)</div>
-        <div className="flex items-end gap-1 h-24" role="img" aria-label={`Score history ${hist.map((h) => `${h.year}: ${fmtNum(h.scoreEqual, 1)}`).join(', ')}`}>
-          {hist.map((h) => (
-            <div key={h.year} className="flex-1 flex flex-col items-center gap-0.5">
-              <div
-                className={`w-full rounded-t ${h.year === row.year ? 'bg-blue-600' : 'bg-blue-200 dark:bg-blue-900'}`}
-                style={{ height: `${Math.max(h.scoreEqual, 2)}%` }}
-                title={`${h.year}: ${fmtNum(h.scoreEqual, 1)}`}
-              />
-              <span className={`text-[9px] ${h.year === row.year ? 'text-blue-700 dark:text-blue-300 font-bold' : 'text-gray-500'}`}>
-                {String(h.year).slice(2)}
-              </span>
-            </div>
-          ))}
-        </div>
+        <ScoreHistory hist={hist} selectedYear={row.year} />
       </div>
+    </div>
+  )
+}
+
+function ScoreHistory({ hist, selectedYear }) {
+  const label = 'Score history ' + hist.map((h) => h.year + ': ' + fmtNum(h.scoreEqual, 1)).join(', ')
+  return (
+    <div className="flex items-end gap-1 h-24" role="img" aria-label={label}>
+      {hist.map((h) => (
+        <div key={h.year} className="flex-1 flex flex-col items-center gap-0.5">
+          <div
+            className={`w-full rounded-t ${h.year === selectedYear ? 'bg-blue-600' : 'bg-blue-200 dark:bg-blue-900'}`}
+            style={{ height: Math.max(h.scoreEqual, 2) + '%' }}
+            title={h.year + ': ' + fmtNum(h.scoreEqual, 1)}
+          />
+          <span
+            className={
+              'text-[9px] ' +
+              (h.year === selectedYear
+                ? 'text-blue-700 dark:text-blue-300 font-bold'
+                : 'text-gray-500')
+            }
+          >
+            {String(h.year).slice(2)}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }

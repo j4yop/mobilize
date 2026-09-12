@@ -115,6 +115,52 @@ export default function PricingTest({ data }) {
         </ResponsiveContainer>
       </div>
 
+      {/* Pillar-level Fama-MacBeth */}
+      {data.famaMacbethPillars && (
+        <div className="card">
+          <h3 className="font-semibold mb-1">Pillar-level test: is any single pillar priced?</h3>
+          <p className="text-sm text-gray-500 mb-3">
+            The composite null could hide offsetting pillar effects — so we re-run the
+            Fama–MacBeth regression on each pillar score separately (same months, same
+            Newey–West correction).
+          </p>
+          <table className="w-full text-sm" aria-label="Pillar-level Fama-MacBeth results">
+            <thead>
+              <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                <th scope="col" className="py-2 pr-4 font-medium">Pillar</th>
+                <th scope="col" className="py-2 pr-4 font-medium">γ (bp/month)</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Newey–West t</th>
+                <th scope="col" className="py-2 pr-4 font-medium">p-value</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Verdict</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.famaMacbethPillars.map((p) => {
+                const significant = Math.abs(p.tNeweyWest) > 1.96
+                return (
+                  <tr key={p.pillar} className="border-b border-gray-100 dark:border-gray-800">
+                    <td className="py-2 pr-4 font-medium">
+                      {{ E: 'Environmental', S: 'Social', G: 'Governance' }[p.pillar] ?? p.pillar}
+                    </td>
+                    <td className="py-2 pr-4 font-mono">{fmtNum(p.gammaMean * 100, 2)}</td>
+                    <td className="py-2 pr-4 font-mono">{fmtNum(p.tNeweyWest, 2)}</td>
+                    <td className="py-2 pr-4 font-mono">{fmtNum(p.pValue, 2)}</td>
+                    <td className={`py-2 pr-4 font-semibold ${significant ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-300'}`}>
+                      {significant ? 'priced' : 'not priced'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <p className="text-xs text-gray-500 mt-2">
+            {data.famaMacbethPillars.every((p) => Math.abs(p.tNeweyWest) <= 1.96)
+              ? 'None of the three pillars is individually priced either — the null is a pillar-level result too, not an artifact of aggregation.'
+              : 'At least one pillar shows significant pricing.'}
+          </p>
+        </div>
+      )}
+
       {/* Monthly gamma strip */}
       <div className="card">
         <h3 className="font-semibold mb-1">Monthly γ (bp)</h3>
