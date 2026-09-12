@@ -235,7 +235,14 @@ export default function OutcomeLab({ data }) {
                   <td className="py-2 pr-4 font-mono">{fmtPct(b.maxTotalReturn)}</td>
                   <td className="py-2 pr-4 text-xs">{b.outcomeUnit}</td>
                   <td className="py-2 pr-4 text-xs">{b.outcomePayer}</td>
-                  <td className="py-2 text-xs">{b.structure}</td>
+                  <td className="py-2 text-xs">
+                    {b.structure}
+                    {!b.principalProtected && (
+                      <span className="ml-1 text-red-700 dark:text-red-400 font-semibold" title="50% of principal was conditional on donation receipts">
+                        ⚠ principal at risk
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

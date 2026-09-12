@@ -296,9 +296,9 @@ def outcome_bond_comparisons() -> list[dict]:
                 "theme": getattr(b, "theme", "black rhino conservation"),
                 "structure": structure,
                 "variable_note": variable_note,
-                "principal_protected": bool(
-                    getattr(b, "principal_protected", True)
-                ),
+                "principal_protected": False
+                if isinstance(b, CapitalAtRiskTerms)
+                else bool(getattr(b, "principal_protected", True)),
                 "url": getattr(b, "url", ""),
             }
         )
