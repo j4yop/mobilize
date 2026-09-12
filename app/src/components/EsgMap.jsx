@@ -23,17 +23,25 @@ function project(x, y) {
   return { cx: ((x + 180) / 360) * W, cy: ((90 - y) / 180) * H }
 }
 
-function scoreColor(score) {
-  // 0 -> deep red, 50 -> amber, 100 -> deep green
+// Light mode needs darker fills for 3:1 non-text contrast on white cards;
+// dark mode keeps the original lighter scale (passes on #111827).
+function scoreColor(score, dark) {
   if (score === null || score === undefined) return '#d1d5db'
   const t = Math.max(0, Math.min(1, score / 100))
   const hue = t * 120 // 0 red -> 120 green
-  return `hsl(${hue}, 65%, ${65 - t * 15}%)`
+  return dark ? `hsl(${hue}, 65%, ${65 - t * 15}%)` : `hsl(${hue}, 70%, ${42 - t * 12}%)`
+}
+
+function useDarkMode() {
+  const [dark] = useState(
+    () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  )
+  return dark
 }
 
 function deltaClass(d) {
-  if (d === null || d === undefined || d === 0) return 'text-gray-400'
-  return d > 0 ? 'text-emerald-600' : 'text-red-600'
+  if (d === null || d === undefined || d === 0) return 'text-gray-600 dark:text-gray-300'
+  return d > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
 }
 
 function fmtDelta(d, digits = 1) {
@@ -44,8 +52,8 @@ function fmtDelta(d, digits = 1) {
 function RankArrow({ change }) {
   if (change === null || change === undefined || change === 0) return null
   if (change > 0)
-    return <span className="text-emerald-600 text-[10px]" title={`Up ${change} from prior year`}>↑</span>
-  return <span className="text-red-600 text-[10px]" title={`Down ${-change} from prior year`}>↓</span>
+    return <span aria-label={`up ${change} places`}>↑</span>
+  return <span aria-label={`down ${change} places`}>↓</span>
 }
 
 export default function EsgMap({ data }) {
@@ -55,6 +63,8 @@ export default function EsgMap({ data }) {
   }, [data])
   const [year, setYear] = useState(Math.max(...years))
   const [selected, setSelected] = useState(null)
+  const dark = useDarkMode()
+  const color = (score) => scoreColor(score, dark)
 
   const rows = useMemo(
     () => data.panel.filter((r) => r.year === year),
@@ -91,18 +101,21 @@ export default function EsgMap({ data }) {
     : null
   const avgDelta = avg !== null && prevAvg !== null ? avg - prevAvg : null
 
+  const select = (iso3) => setSelected(iso3 === selected ? null : iso3)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold">Sovereign ESG scores</h2>
           <p className="text-sm text-gray-500">
-            World Bank Sovereign-ESG-style composite (equal-weight pillars). Click a country for detail.
+            World Bank Sovereign-ESG-style composite (equal-weight pillars). Click or focus + Enter a country for detail.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-500">Year</label>
+          <label htmlFor="esg-year-select" className="text-sm text-gray-500">Year</label>
           <select
+            id="esg-year-select"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
             className="border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-900"
@@ -126,14 +139,19 @@ export default function EsgMap({ data }) {
             )}
           </span>
         </div>
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-          <text x={10} y={18} fontSize={11} fill="#6b7280" fontWeight="600">{year}</text>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full"
+          role="img"
+          aria-label={`World map of sovereign ESG scores for ${year}. Scores also listed in the rankings table.`}
+        >
+          <title>ESG score map, {year}</title>
           {/* graticule */}
           {[0, 60, 120, 180, 240, 300].map((x) => (
-            <line key={`v${x}`} x1={x} y1={0} x2={x} y2={H} stroke="#e5e7eb" strokeWidth={0.5} />
+            <line key={`v${x}`} x1={x} y1={0} x2={x} y2={H} stroke="#e5e7eb" strokeWidth={0.5} className="map-graticule" />
           ))}
           {[30, 60, 90, 120, 150].map((y) => (
-            <line key={`h${y}`} x1={0} y1={y} x2={W} y2={H} stroke="#e5e7eb" strokeWidth={0.5} />
+            <line key={`h${y}`} x1={0} y1={y} x2={W} y2={H} stroke="#e5e7eb" strokeWidth={0.5} className="map-graticule" />
           ))}
 
           {Object.entries(POSITIONS).map(([iso3, { x, y }]) => {
@@ -144,18 +162,28 @@ export default function EsgMap({ data }) {
             const radius = 8
             const isSel = selected === iso3
             return (
-              <g key={iso3} onClick={() => setSelected(iso3)} className="cursor-pointer">
+              <g
+                key={iso3}
+                role="button"
+                tabIndex={0}
+                aria-label={`${r.country}: ESG score ${fmtNum(score, 1)} of 100`}
+                aria-pressed={isSel}
+                onClick={() => select(iso3)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(iso3) } }}
+                className="cursor-pointer focus:outline-none"
+              >
+                <circle cx={cx} cy={cy} r={radius + 6} fill="transparent" />
                 <circle
                   cx={cx}
                   cy={cy}
                   r={isSel ? radius + 3 : radius}
-                  fill={scoreColor(score)}
-                  fillOpacity={0.85}
-                  stroke={isSel ? '#111827' : 'white'}
+                  fill={color(score)}
+                  fillOpacity={0.9}
+                  stroke={isSel ? (dark ? '#f9fafb' : '#111827') : 'white'}
                   strokeWidth={isSel ? 2 : 1}
                   style={{ transition: 'fill 300ms' }}
                 />
-                <text x={cx + radius + 3} y={cy + 3} fontSize={9} fill="#6b7280">
+                <text x={cx + radius + 3} y={cy + 3} fontSize={9} fill={dark ? '#d1d5db' : '#4b5563'}>
                   {iso3}
                 </text>
               </g>
@@ -167,7 +195,8 @@ export default function EsgMap({ data }) {
           <span>Low ESG</span>
           <div
             className="h-2 w-40 rounded"
-            style={{ background: 'linear-gradient(to right, hsl(0,65%,65%), hsl(60,65%,57%), hsl(120,65%,50%))' }}
+            style={{ background: 'linear-gradient(to right, hsl(0,70%,42%), hsl(60,70%,38%), hsl(120,70%,30%))' }}
+            aria-hidden="true"
           />
           <span>High ESG</span>
         </div>
@@ -176,9 +205,21 @@ export default function EsgMap({ data }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Rankings */}
         <div className="card overflow-hidden">
-          <h3 className="font-semibold mb-2">Rankings — {year}</h3>
+          <h3 className="font-semibold mb-2" id="rankings-heading">Rankings — {year}</h3>
           <div className="max-h-96 overflow-y-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm" aria-labelledby="rankings-heading">
+              <caption className="sr-only">
+                Countries ranked by sovereign ESG score for {year}, with change versus {year - 1 || 'prior year'}.
+              </caption>
+              <thead>
+                <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                  <th scope="col" className="py-1.5 pr-2 font-medium">Rank</th>
+                  <th scope="col" className="py-1.5 pr-2 font-medium">Country</th>
+                  <th scope="col" className="py-1.5 pr-2 font-medium text-right">Score</th>
+                  <th scope="col" className="py-1.5 pr-2 font-medium text-right">Δ vs prior yr</th>
+                  <th scope="col" className="py-1.5 w-20"><span className="sr-only">Score bar</span></th>
+                </tr>
+              </thead>
               <tbody>
                 {ranked.map((r, i) => {
                   const prev = prevByIso[r.iso3]
@@ -193,10 +234,15 @@ export default function EsgMap({ data }) {
                   return (
                     <tr
                       key={r.iso3}
-                      className="border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                      onClick={() => setSelected(r.iso3)}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`${r.country}, rank ${i + 1}, score ${fmtNum(r.scoreEqual, 1)}`}
+                      aria-pressed={selected === r.iso3}
+                      className="border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800 focus:outline-none"
+                      onClick={() => select(r.iso3)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(r.iso3) } }}
                     >
-                      <td className="py-1.5 pr-2 text-gray-400 w-12 whitespace-nowrap">
+                      <td className="py-1.5 pr-2 text-gray-500 w-12 whitespace-nowrap">
                         {i + 1} <RankArrow change={rankChg} />
                       </td>
                       <td className="py-1.5 pr-2">{r.country}</td>
@@ -205,7 +251,7 @@ export default function EsgMap({ data }) {
                         {fmtDelta(delta)}
                       </td>
                       <td className="w-20">
-                        <div className="h-2 rounded" style={{ width: `${r.scoreEqual}%`, background: scoreColor(r.scoreEqual) }} />
+                        <div className="h-2 rounded" style={{ width: `${r.scoreEqual}%`, background: color(r.scoreEqual) }} />
                       </td>
                     </tr>
                   )
@@ -218,7 +264,7 @@ export default function EsgMap({ data }) {
         {/* Drilldown */}
         <div className="card">
           {selected && byIso[selected] ? (
-            <CountryDetail data={data} iso3={selected} row={byIso[selected]} />
+            <CountryDetail data={data} iso3={selected} row={byIso[selected]} color={color} />
           ) : (
             <p className="text-sm text-gray-500">Select a country on the map or in the rankings.</p>
           )}
@@ -228,7 +274,7 @@ export default function EsgMap({ data }) {
   )
 }
 
-function CountryDetail({ data, iso3, row }) {
+function CountryDetail({ data, iso3, row, color }) {
   const hist = data.panel.filter((r) => r.iso3 === iso3 && r.scoreEqual !== null)
   const prev = data.panel.find((r) => r.iso3 === iso3 && r.year === row.year - 1)
   const delta =
@@ -241,7 +287,7 @@ function CountryDetail({ data, iso3, row }) {
   return (
     <div>
       <h3 className="font-bold text-lg">{row.country}</h3>
-      <p className="text-xs text-gray-400 mb-3">
+      <p className="text-xs text-gray-500 mb-3">
         {iso3} · score {fmtNum(row.scoreEqual, 1)}/100 ({row.year})
         {delta !== null && (
           <span className={`ml-1 ${deltaClass(delta)}`}>
@@ -251,9 +297,9 @@ function CountryDetail({ data, iso3, row }) {
       </p>
 
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <Pillar label="Environmental" value={row.pillarE} />
-        <Pillar label="Social" value={row.pillarS} />
-        <Pillar label="Governance" value={row.pillarG} />
+        <Pillar label="Environmental" value={row.pillarE} color={color} />
+        <Pillar label="Social" value={row.pillarS} color={color} />
+        <Pillar label="Governance" value={row.pillarG} color={color} />
       </div>
 
       <div className="text-sm space-y-1 mb-4">
@@ -269,7 +315,7 @@ function CountryDetail({ data, iso3, row }) {
 
       <div>
         <div className="text-sm text-gray-500 mb-1">Score history (equal-weight vs PCA)</div>
-        <div className="flex items-end gap-1 h-24">
+        <div className="flex items-end gap-1 h-24" role="img" aria-label={`Score history ${hist.map((h) => `${h.year}: ${fmtNum(h.scoreEqual, 1)}`).join(', ')}`}>
           {hist.map((h) => (
             <div key={h.year} className="flex-1 flex flex-col items-center gap-0.5">
               <div
@@ -277,7 +323,7 @@ function CountryDetail({ data, iso3, row }) {
                 style={{ height: `${Math.max(h.scoreEqual, 2)}%` }}
                 title={`${h.year}: ${fmtNum(h.scoreEqual, 1)}`}
               />
-              <span className={`text-[9px] ${h.year === row.year ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
+              <span className={`text-[9px] ${h.year === row.year ? 'text-blue-700 dark:text-blue-300 font-bold' : 'text-gray-500'}`}>
                 {String(h.year).slice(2)}
               </span>
             </div>
@@ -288,12 +334,12 @@ function CountryDetail({ data, iso3, row }) {
   )
 }
 
-function Pillar({ label, value }) {
+function Pillar({ label, value, color }) {
   return (
     <div>
       <div className="text-xs text-gray-500">{label}</div>
       <div className="text-lg font-bold font-mono">{value === null ? '—' : fmtNum(value, 0)}</div>
-      <div className="h-1.5 rounded mt-1" style={{ width: '100%', background: scoreColor(value) }} />
+      <div className="h-1.5 rounded mt-1" style={{ width: '100%', background: color(value) }} />
     </div>
   )
 }

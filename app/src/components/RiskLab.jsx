@@ -60,13 +60,14 @@ export default function RiskLab({ data }) {
             no look-ahead. {freq === 'monthly' ? '131 monthly observations' : '11 annual observations'}.
           </p>
         </div>
-        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1" role="group" aria-label="Sampling frequency">
           {['annual', 'monthly'].map((f) => (
             <button
               key={f}
               onClick={() => setFreq(f)}
+              aria-pressed={freq === f}
               className={`px-3 py-1.5 rounded-md text-sm font-medium capitalize ${
-                freq === f ? 'bg-white dark:bg-gray-900 shadow' : 'text-gray-500'
+                freq === f ? 'bg-white dark:bg-gray-900 shadow' : 'text-gray-600 dark:text-gray-300'
               }`}
             >
               {f}
@@ -79,7 +80,11 @@ export default function RiskLab({ data }) {
       <div className="card">
         <h3 className="font-semibold mb-1">Growth of $1</h3>
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+          <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+            role="img"
+            title="Growth of one dollar, 2013 to 2023"
+            desc={`Cumulative growth of $1 for the three portfolios over 2013–2023 (${freq} sampling). Full values in the metrics table below.`}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={xTick * 2 - 1} />
             <YAxis tick={{ fontSize: 11 }} domain={['auto', 'auto']} />
@@ -107,7 +112,11 @@ export default function RiskLab({ data }) {
           Monthly sampling reveals intra-year drawdowns annual sampling misses.
         </p>
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={ddData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+          <AreaChart data={ddData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+            role="img"
+            title="Drawdown from running peak"
+            desc={`Percentage decline from the running peak for each portfolio (${freq} sampling). Worst drawdown around −19% to −21%.`}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={xTick * 2 - 1} />
             <YAxis tick={{ fontSize: 11 }} unit="%" />
@@ -192,13 +201,13 @@ export default function RiskLab({ data }) {
                 <td className="py-2 pr-4">{PORTFOLIO_META[s.strategy]?.label ?? s.strategy}</td>
                 <td className="py-2 pr-4 font-mono">{fmtNum(s.volDiff * 100, 3)}pp</td>
                 <td className="py-2 pr-4 font-mono">
-                  <span className={s.volP < 0.05 ? 'text-emerald-600 font-semibold' : ''}>
+                  <span className={s.volP < 0.05 ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : ''}>
                     {s.volP < 0.001 ? '<0.001' : s.volP.toFixed(3)}
                   </span>
                 </td>
                 <td className="py-2 pr-4 font-mono">{fmtNum(s.meanRetDiff * 100, 3)}pp</td>
                 <td className="py-2 pr-4 font-mono">
-                  <span className={s.meanRetP < 0.05 ? 'text-emerald-600 font-semibold' : ''}>
+                  <span className={s.meanRetP < 0.05 ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : ''}>
                     {s.meanRetP < 0.001 ? '<0.001' : s.meanRetP.toFixed(3)}
                   </span>
                 </td>

@@ -71,7 +71,11 @@ export default function PricingTest({ data }) {
         <h3 className="font-semibold mb-1">Distribution of monthly γ (bp)</h3>
         <p className="text-sm text-gray-500 mb-2">Each bar = 2bp bin of the cross-sectional ESG coefficient.</p>
         <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={histData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+          <BarChart data={histData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+            role="img"
+            title="Distribution of monthly ESG factor coefficients"
+            desc={`Histogram of the ${fm.nMonths} monthly cross-sectional ESG coefficients (γ), in 2bp bins. Mean ${fmtNum(fm.gammaMean * 100, 2)}bp/month.`}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis
               dataKey="bin"
@@ -96,7 +100,11 @@ export default function PricingTest({ data }) {
           A persistent drift would indicate pricing; here it wanders around zero.
         </p>
         <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={cumData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+          <LineChart data={cumData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+            role="img"
+            title="Cumulative ESG factor coefficient over time"
+            desc="Sum of monthly γ coefficients in basis points; a persistent drift away from zero would indicate pricing."
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={11} />
             <YAxis tick={{ fontSize: 11 }} unit="bp" />
