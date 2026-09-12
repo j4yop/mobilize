@@ -31,6 +31,23 @@ function scoreColor(score) {
   return `hsl(${hue}, 65%, ${65 - t * 15}%)`
 }
 
+function deltaClass(d) {
+  if (d === null || d === undefined || d === 0) return 'text-gray-400'
+  return d > 0 ? 'text-emerald-600' : 'text-red-600'
+}
+
+function fmtDelta(d, digits = 1) {
+  if (d === null || d === undefined) return '—'
+  return `${d > 0 ? '+' : ''}${d.toFixed(digits)}`
+}
+
+function RankArrow({ change }) {
+  if (change === null || change === undefined || change === 0) return null
+  if (change > 0)
+    return <span className="text-emerald-600 text-[10px]" title={`Up ${change} from prior year`}>↑</span>
+  return <span className="text-red-600 text-[10px]" title={`Down ${-change} from prior year`}>↓</span>
+}
+
 export default function EsgMap({ data }) {
   const years = useMemo(() => {
     const ys = [...new Set(data.panel.map((r) => r.year))].sort()
@@ -46,9 +63,33 @@ export default function EsgMap({ data }) {
   const byIso = {}
   for (const r of rows) byIso[r.iso3] = r
 
+  const prevByIso = useMemo(() => {
+    const m = {}
+    for (const r of data.panel) if (r.year === year - 1) m[r.iso3] = r
+    return m
+  }, [data, year])
+
   const ranked = [...rows]
     .filter((r) => r.scoreEqual !== null)
     .sort((a, b) => b.scoreEqual - a.scoreEqual)
+  const rankByIso = {}
+  ranked.forEach((r, i) => { rankByIso[r.iso3] = i + 1 })
+
+  const prevRanked = Object.values(prevByIso)
+    .filter((r) => r.scoreEqual !== null)
+    .sort((a, b) => b.scoreEqual - a.scoreEqual)
+  const prevRankByIso = {}
+  prevRanked.forEach((r, i) => { prevRankByIso[r.iso3] = i + 1 })
+
+  const scored = rows.filter((r) => r.scoreEqual !== null)
+  const avg = scored.length
+    ? scored.reduce((s, r) => s + r.scoreEqual, 0) / scored.length
+    : null
+  const prevScored = Object.values(prevByIso).filter((r) => r.scoreEqual !== null)
+  const prevAvg = prevScored.length
+    ? prevScored.reduce((s, r) => s + r.scoreEqual, 0) / prevScored.length
+    : null
+  const avgDelta = avg !== null && prevAvg !== null ? avg - prevAvg : null
 
   return (
     <div className="space-y-6">
@@ -74,7 +115,19 @@ export default function EsgMap({ data }) {
       </div>
 
       <div className="card">
+        <div className="flex items-center justify-between text-sm mb-2">
+          <span className="text-gray-500">Universe average — {year}</span>
+          <span className="font-mono">
+            <span className="font-semibold">{fmtNum(avg, 1)}</span>
+            {avgDelta !== null && (
+              <span className={`ml-2 text-xs ${deltaClass(avgDelta)}`}>
+                {fmtDelta(avgDelta)} vs {year - 1}
+              </span>
+            )}
+          </span>
+        </div>
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+          <text x={10} y={18} fontSize={11} fill="#6b7280" fontWeight="600">{year}</text>
           {/* graticule */}
           {[0, 60, 120, 180, 240, 300].map((x) => (
             <line key={`v${x}`} x1={x} y1={0} x2={x} y2={H} stroke="#e5e7eb" strokeWidth={0.5} />
@@ -100,6 +153,7 @@ export default function EsgMap({ data }) {
                   fillOpacity={0.85}
                   stroke={isSel ? '#111827' : 'white'}
                   strokeWidth={isSel ? 2 : 1}
+                  style={{ transition: 'fill 300ms' }}
                 />
                 <text x={cx + radius + 3} y={cy + 3} fontSize={9} fill="#6b7280">
                   {iso3}
@@ -126,20 +180,36 @@ export default function EsgMap({ data }) {
           <div className="max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
               <tbody>
-                {ranked.map((r, i) => (
-                  <tr
-                    key={r.iso3}
-                    className="border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => setSelected(r.iso3)}
-                  >
-                    <td className="py-1.5 pr-2 text-gray-400 w-8">{i + 1}</td>
-                    <td className="py-1.5 pr-2">{r.country}</td>
-                    <td className="py-1.5 pr-2 text-right font-mono">{fmtNum(r.scoreEqual, 1)}</td>
-                    <td className="w-24">
-                      <div className="h-2 rounded" style={{ width: `${r.scoreEqual}%`, background: scoreColor(r.scoreEqual) }} />
-                    </td>
-                  </tr>
-                ))}
+                {ranked.map((r, i) => {
+                  const prev = prevByIso[r.iso3]
+                  const delta =
+                    prev && prev.scoreEqual !== null && r.scoreEqual !== null
+                      ? r.scoreEqual - prev.scoreEqual
+                      : null
+                  const rankChg =
+                    prevRankByIso[r.iso3] && rankByIso[r.iso3]
+                      ? prevRankByIso[r.iso3] - rankByIso[r.iso3]
+                      : null
+                  return (
+                    <tr
+                      key={r.iso3}
+                      className="border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                      onClick={() => setSelected(r.iso3)}
+                    >
+                      <td className="py-1.5 pr-2 text-gray-400 w-12 whitespace-nowrap">
+                        {i + 1} <RankArrow change={rankChg} />
+                      </td>
+                      <td className="py-1.5 pr-2">{r.country}</td>
+                      <td className="py-1.5 pr-2 text-right font-mono">{fmtNum(r.scoreEqual, 1)}</td>
+                      <td className={`py-1.5 pr-2 text-right font-mono text-xs ${deltaClass(delta)}`}>
+                        {fmtDelta(delta)}
+                      </td>
+                      <td className="w-20">
+                        <div className="h-2 rounded" style={{ width: `${r.scoreEqual}%`, background: scoreColor(r.scoreEqual) }} />
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -160,13 +230,25 @@ export default function EsgMap({ data }) {
 
 function CountryDetail({ data, iso3, row }) {
   const hist = data.panel.filter((r) => r.iso3 === iso3 && r.scoreEqual !== null)
+  const prev = data.panel.find((r) => r.iso3 === iso3 && r.year === row.year - 1)
+  const delta =
+    prev && prev.scoreEqual !== null && row.scoreEqual !== null
+      ? row.scoreEqual - prev.scoreEqual
+      : null
   const inTilt = (data.weights.esg_tilted?.[iso3] ?? 0) * 100
   const inBench = (data.weights.benchmark?.[iso3] ?? 0) * 100
 
   return (
     <div>
       <h3 className="font-bold text-lg">{row.country}</h3>
-      <p className="text-xs text-gray-400 mb-3">{iso3} · score {fmtNum(row.scoreEqual, 1)}/100 ({row.year})</p>
+      <p className="text-xs text-gray-400 mb-3">
+        {iso3} · score {fmtNum(row.scoreEqual, 1)}/100 ({row.year})
+        {delta !== null && (
+          <span className={`ml-1 ${deltaClass(delta)}`}>
+            ({fmtDelta(delta)} vs {row.year - 1})
+          </span>
+        )}
+      </p>
 
       <div className="grid grid-cols-3 gap-3 mb-4">
         <Pillar label="Environmental" value={row.pillarE} />
@@ -191,11 +273,13 @@ function CountryDetail({ data, iso3, row }) {
           {hist.map((h) => (
             <div key={h.year} className="flex-1 flex flex-col items-center gap-0.5">
               <div
-                className="w-full rounded-t bg-blue-500"
+                className={`w-full rounded-t ${h.year === row.year ? 'bg-blue-600' : 'bg-blue-200 dark:bg-blue-900'}`}
                 style={{ height: `${Math.max(h.scoreEqual, 2)}%` }}
                 title={`${h.year}: ${fmtNum(h.scoreEqual, 1)}`}
               />
-              <span className="text-[9px] text-gray-400">{String(h.year).slice(2)}</span>
+              <span className={`text-[9px] ${h.year === row.year ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
+                {String(h.year).slice(2)}
+              </span>
             </div>
           ))}
         </div>
