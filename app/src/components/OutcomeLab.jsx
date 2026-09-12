@@ -65,7 +65,11 @@ export default function OutcomeLab({ data }) {
             GBM population model: 4%/yr drift, 3% vol. KPI = annualized 5y growth rate.
           </p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={tiersData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+            <BarChart data={tiersData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+              role="img"
+              title="Success payment tier probabilities"
+              desc={`Probability of each rhino-growth outcome tier under the baseline model (4%/yr drift): no success ${fmtPct(base.pFail)}, 0–2% ${fmtPct(base.pTier1)}, 2–4% ${fmtPct(base.pTier2)}, >4% ${fmtPct(base.pTier3)}.`}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="tier" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 11 }} domain={[0, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
@@ -109,7 +113,11 @@ export default function OutcomeLab({ data }) {
           the bond's economics swing from near-parity to a large investor premium.
         </p>
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={drift} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+          <BarChart data={drift} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+            role="img"
+            title="Expected success payment by growth drift assumption"
+            desc="Expected success payment per $1,000 as the assumed annual rhino population growth (drift) varies. Exact values in the table below."
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="drift" tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} unit="$" />
@@ -159,7 +167,11 @@ export default function OutcomeLab({ data }) {
           {zafGov && ` South Africa scores ${zafGov}/100.`}
         </p>
         <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={sens} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+          <LineChart data={sens} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+            role="img"
+            title="Required success payment by governance score"
+            desc="Success payment a donor must offer per $1,000 to hold investor economics fixed, as the issuer-country governance score ranges 10 to 90. The red dashed line marks South Africa's score."
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="govScore" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} domain={['auto', 'auto']} unit="$" />
@@ -189,9 +201,9 @@ export default function OutcomeLab({ data }) {
 function Box({ label, value, note }) {
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-      <div className="text-gray-500 text-xs">{label}</div>
-      <div className="font-bold text-lg font-mono mt-0.5">{value}</div>
-      <div className="text-gray-400 text-xs">{note}</div>
+        <div className="text-gray-600 dark:text-gray-300 text-xs">{label}</div>
+        <div className="font-bold text-lg font-mono mt-0.5">{value}</div>
+      <div className="text-gray-600 dark:text-gray-300 text-xs">{note}</div>
     </div>
   )
 }
