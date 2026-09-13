@@ -21,7 +21,7 @@ await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 check('App loads, header present', await page.locator('h1:has-text("Mobilize")').count() === 1)
 
 // Header finding cards (4)
-const findingCards = await page.locator('.grid .card').count()
+const findingCards = await page.locator('.finding-card').count()
 check('4 headline finding cards', findingCards === 4, `got ${findingCards}`)
 check('Finding card values render (no NaN/undefined)',
   await page.evaluate(() => !document.body.innerText.match(/NaN|undefined/)))
@@ -94,11 +94,11 @@ await page.waitForTimeout(300)
 check('Methodology renders sections', (await page.locator('h3').count()) >= 4)
 check('Methodology mentions duration proxy', (await page.locator('text=/duration approximation/').count()) === 1)
 
-// --- Dark mode (system preference) ---
+// --- Dark scheme request must not flip the light editorial theme ---
 const darkPage = await browser.newPage({ viewport: { width: 1280, height: 900 }, colorScheme: 'dark' })
 await darkPage.goto(BASE + '/', { waitUntil: 'networkidle' })
 const bgDark = await darkPage.evaluate(() => getComputedStyle(document.body).backgroundColor)
-check('Dark mode applies on system preference (bg changes)', bgDark === 'rgb(11, 15, 25)')
+check('Light theme persists regardless of system preference', bgDark === 'rgb(245, 242, 236)')
 
 // --- Mobile viewport ---
 const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } })
@@ -201,7 +201,7 @@ check('F2: seven bonds listed', famRows === 7, `${famRows}`)
 for (const name of ['Clean Cooking', 'Amazon', 'Plastic', 'Spekboom', 'Emissions', 'UNICEF']) {
   check(`F2: ${name} listed`, await page.locator(`text=${name}`).count() >= 1)
 }
-check('F2: rhino row highlighted', await page.locator('tr.bg-blue-50, tr.bg-blue-900\\/30').count() >= 1)
+check('F2: rhino row highlighted', await page.locator('tr.rhino-row').count() >= 1)
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 
 // ARIA tabs pattern
