@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useDashboardData } from './hooks.js'
 import RiskLab from './components/RiskLab.jsx'
 import EsgMap from './components/EsgMap.jsx'
 import PricingTest from './components/PricingTest.jsx'
 import OutcomeLab from './components/OutcomeLab.jsx'
 import Methodology from './components/Methodology.jsx'
+import '@designcodeio/threeui/style.css'
+
+// Ambient ThreeUI particle field — heavy dependency, loaded only when the
+// hero is actually shown (desktop, motion allowed, data present).
+const ParticleHero = lazy(() => import('./ParticleHero.jsx'))
 
 const TABS = [
   { id: 'risk', label: 'Risk Lab' },
@@ -157,7 +162,8 @@ export default function App() {
                   aria-controls={`panel-${t.id}`}
                   tabIndex={selected ? 0 : -1}
                   onClick={() => onTabChange(t.id)}
-                  onKeyDown={(e) => onTabKeyDown(e, i)}                  className="tab-btn"
+                  onKeyDown={(e) => onTabKeyDown(e, i)}
+                  className="tab-btn"
                 >
                   {t.label}
                 </button>
@@ -167,7 +173,12 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 pt-8 pb-16 space-y-8" id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
+      {/* Ambient hero band — particle texture behind the findings strip */}
+      <div style={{ position: 'relative' }}>
+        <Suspense fallback={null}>
+          <ParticleHero />
+        </Suspense>
+        <main className="max-w-6xl mx-auto px-6 pt-8 pb-16 space-y-8 relative" style={{ zIndex: 1 }} id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
         {/* Headline findings strip */}
         <section aria-label="Headline findings">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px rounded-sm overflow-hidden"
@@ -211,7 +222,8 @@ export default function App() {
         {tab === 'pricing' && <PricingTest data={data} />}
         {tab === 'outcome' && <OutcomeLab data={data} />}
         {tab === 'method' && <Methodology />}
-      </main>
+        </main>
+      </div>
 
       <footer className="mt-12" style={{ borderTop: '1px solid var(--line-strong)' }}>
         <div className="max-w-6xl mx-auto px-6 py-6 flex flex-wrap gap-x-6 gap-y-2 justify-between text-[12px]" style={{ color: 'var(--muted)' }}>
