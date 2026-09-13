@@ -23,25 +23,27 @@ function project(x, y) {
   return { cx: ((x + 180) / 360) * W, cy: ((90 - y) / 180) * H }
 }
 
-// Light mode needs darker fills for 3:1 non-text contrast on white cards;
-// dark mode keeps the original lighter scale (passes on #111827).
-function scoreColor(score, dark) {
+// Warm editorial scale: brick -> ochre -> pine, lightness lifted with score.
+const SCALE = [
+  { at: 0, rgb: [138, 47, 43] },   // --ser
+  { at: 0.5, rgb: [154, 123, 46] }, // --gold
+  { at: 1, rgb: [46, 107, 94] },    // --teal
+]
+function scoreColor(score) {
   if (score === null || score === undefined) return '#d1d5db'
   const t = Math.max(0, Math.min(1, score / 100))
-  const hue = t * 120 // 0 red -> 120 green
-  return dark ? `hsl(${hue}, 65%, ${65 - t * 15}%)` : `hsl(${hue}, 70%, ${42 - t * 12}%)`
+  let i = 0
+  while (i < SCALE.length - 2 && t > SCALE[i + 1].at) i++
+  const a = SCALE[i], b = SCALE[i + 1]
+  const u = (t - a.at) / (b.at - a.at)
+  const lift = 6 + t * 8 // slightly brighter as scores improve
+  const mix = a.rgb.map((c, k) => Math.round(c + (b.rgb[k] - c) * u + lift * (k === 0 ? 0.4 : k === 2 ? -0.4 : 0)))
+  return `rgb(${mix[0]},${mix[1]},${mix[2]})`
 }
 
-function useDarkMode() {
-  const [dark] = useState(
-    () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
-  )
-  return dark
-}
-
-function deltaClass(d) {
-  if (d === null || d === undefined || d === 0) return 'text-gray-600 dark:text-gray-300'
-  return d > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
+function deltaColor(d) {
+  if (d === null || d === undefined || d === 0) return 'var(--muted)'
+  return d > 0 ? 'var(--teal)' : 'var(--ser)'
 }
 
 function fmtDelta(d, digits = 1) {
@@ -99,8 +101,7 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
     if (initialCountry !== undefined) setSelected(initialCountry)
   }, [initialCountry]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const dark = useDarkMode()
-  const color = (score) => scoreColor(score, dark)
+  const color = scoreColor
 
   // Deep-link write-back: keep the URL in sync with year/country selection
   useEffect(() => {
@@ -160,20 +161,21 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-bold">Sovereign ESG scores</h2>
-          <p className="text-sm text-gray-500">
+          <div className="eyebrow mb-1">02 — Scores</div>
+          <h2 className="text-lg font-bold tracking-tight">Sovereign ESG scores</h2>
+          <p className="text-sm mt-0.5 max-w-xl" style={{ color: 'var(--muted)' }}>
             World Bank Sovereign-ESG-style composite (equal-weight pillars). Click or focus + Enter a country for detail.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="esg-year-select" className="text-sm text-gray-500">Year</label>
+          <label htmlFor="esg-year-select" className="text-sm" style={{ color: 'var(--muted)' }}>Year</label>
           <select
             id="esg-year-select"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-900"
+            className="native-select"
           >
             {years.map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -183,12 +185,12 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
       </div>
 
       <div className="card">
-        <div className="flex items-center justify-between text-sm mb-2">
-          <span className="text-gray-500">Universe average — {year}</span>
-          <span className="font-mono">
-            <span className="font-semibold">{fmtNum(avg, 1)}</span>
+        <div className="flex items-center justify-between text-sm mb-3">
+          <span className="rule-label">Universe average — {year}</span>
+          <span className="num flex items-baseline gap-2">
+            <span className="text-base font-semibold">{fmtNum(avg, 1)}</span>
             {avgDelta !== null && (
-              <span className={`ml-2 text-xs ${deltaClass(avgDelta)}`}>
+              <span className="text-xs" style={{ color: deltaColor(avgDelta) }}>
                 {fmtDelta(avgDelta)} vs {year - 1}
               </span>
             )}
@@ -203,10 +205,10 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
           <title>ESG score map, {year}</title>
           {/* graticule */}
           {[0, 60, 120, 180, 240, 300].map((x) => (
-            <line key={`v${x}`} x1={x} y1={0} x2={x} y2={H} stroke="#e5e7eb" strokeWidth={0.5} className="map-graticule" />
+            <line key={`v${x}`} x1={x} y1={0} x2={x} y2={H} strokeWidth={0.5} className="map-graticule" />
           ))}
           {[30, 60, 90, 120, 150].map((y) => (
-            <line key={`h${y}`} x1={0} y1={y} x2={W} y2={H} stroke="#e5e7eb" strokeWidth={0.5} className="map-graticule" />
+            <line key={`h${y}`} x1={0} y1={y} x2={W} y2={H} strokeWidth={0.5} className="map-graticule" />
           ))}
 
           {Object.entries(POSITIONS).map(([iso3, { x, y }]) => {
@@ -234,11 +236,14 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
                   r={isSel ? radius + 3 : radius}
                   fill={color(score)}
                   fillOpacity={0.9}
-                  stroke={isSel ? (dark ? '#f9fafb' : '#111827') : 'white'}
-                  strokeWidth={isSel ? 2 : 1}
-                  style={{ transition: 'fill 300ms' }}
+                  stroke={isSel ? 'var(--ink)' : 'var(--paper)'}
+                  strokeWidth={isSel ? 2 : 1.25}
+                  style={{ transition: 'r 150ms, stroke 150ms' }}
                 />
-                <text x={cx + radius + 3} y={cy + 3} fontSize={9} fill={dark ? '#d1d5db' : '#4b5563'}>
+                {isSel && (
+                  <circle cx={cx} cy={cy} r={radius + 6.5} fill="none" stroke="var(--accent)" strokeWidth={1} />
+                )}
+                <text x={cx + radius + 3} y={cy + 3} fontSize={9} fill="var(--muted)" style={{ letterSpacing: '0.04em' }}>
                   {iso3}
                 </text>
               </g>
@@ -246,11 +251,14 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
           })}
         </svg>
         {/* legend */}
-        <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+        <div className="flex items-center gap-2 mt-2 text-xs" style={{ color: 'var(--muted)' }}>
           <span>Low ESG</span>
           <div
-            className="h-2 w-40 rounded"
-            style={{ background: 'linear-gradient(to right, hsl(0,70%,42%), hsl(60,70%,38%), hsl(120,70%,30%))' }}
+            className="h-2 w-40 rounded-sm"
+            style={{
+              background:
+                'linear-gradient(to right, rgb(144,56,51), rgb(160,132,50), rgb(54,116,101))',
+            }}
             aria-hidden="true"
           />
           <span>High ESG</span>
@@ -260,27 +268,27 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Rankings */}
         <div className="card overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold" id="rankings-heading">Rankings — {year}</h3>
-            <button
-              onClick={() => exportPanelCsv(data)}
-              className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300"
-            >
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="font-semibold tracking-tight" id="rankings-heading">Rankings — {year}</h3>
+            <button onClick={() => exportPanelCsv(data)} className="btn">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M6 1v7M3 5.5 6 8.5 9 5.5M2 10.5h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
               Download panel (CSV)
             </button>
           </div>
-          <div className="max-h-96 overflow-y-auto">
-            <table className="w-full text-sm" aria-labelledby="rankings-heading">
+          <div className="max-h-96 overflow-y-auto -mx-1.5 px-1.5">
+            <table className="data" aria-labelledby="rankings-heading">
               <caption className="sr-only">
                 Countries ranked by sovereign ESG score for {year}, with change versus {year - 1 || 'prior year'}.
               </caption>
               <thead>
-                <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
-                  <th scope="col" className="py-1.5 pr-2 font-medium">Rank</th>
-                  <th scope="col" className="py-1.5 pr-2 font-medium">Country</th>
-                  <th scope="col" className="py-1.5 pr-2 font-medium text-right">Score</th>
-                  <th scope="col" className="py-1.5 pr-2 font-medium text-right">Δ vs prior yr</th>
-                  <th scope="col" className="py-1.5 w-20"><span className="sr-only">Score bar</span></th>
+                <tr>
+                  <th scope="col" className="w-12">Rank</th>
+                  <th scope="col">Country</th>
+                  <th scope="col" className="text-right">Score</th>
+                  <th scope="col" className="text-right">Δ prior yr</th>
+                  <th scope="col" className="w-20"><span className="sr-only">Score bar</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -294,27 +302,36 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
                     prevRankByIso[r.iso3] && rankByIso[r.iso3]
                       ? prevRankByIso[r.iso3] - rankByIso[r.iso3]
                       : null
+                  const isSel = selected === r.iso3
                   return (
                     <tr
                       key={r.iso3}
                       tabIndex={0}
                       role="button"
                       aria-label={`${r.country}, rank ${i + 1}, score ${fmtNum(r.scoreEqual, 1)}`}
-                      aria-pressed={selected === r.iso3}
-                      className="border-b border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800 focus:outline-none"
+                      aria-pressed={isSel}
+                      className="cursor-pointer"
+                      style={{
+                        background: isSel ? 'rgba(138,47,43,0.06)' : undefined,
+                        outline: 'none',
+                      }}
+                      onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = 'rgba(42,58,72,0.04)' }}
+                      onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = undefined }}
+                      onFocus={(e) => { e.currentTarget.style.background = 'rgba(138,47,43,0.06)' }}
+                      onBlur={(e) => { if (!isSel) e.currentTarget.style.background = undefined }}
                       onClick={() => select(r.iso3)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(r.iso3) } }}
                     >
-                      <td className="py-1.5 pr-2 text-gray-500 w-12 whitespace-nowrap">
+                      <td className="num w-12 whitespace-nowrap" style={{ color: 'var(--faint)' }}>
                         {i + 1} <RankArrow change={rankChg} />
                       </td>
-                      <td className="py-1.5 pr-2">{r.country}</td>
-                      <td className="py-1.5 pr-2 text-right font-mono">{fmtNum(r.scoreEqual, 1)}</td>
-                      <td className={`py-1.5 pr-2 text-right font-mono text-xs ${deltaClass(delta)}`}>
+                      <td>{r.country}</td>
+                      <td className="num text-right font-medium">{fmtNum(r.scoreEqual, 1)}</td>
+                      <td className="num text-right text-xs" style={{ color: deltaColor(delta) }}>
                         {fmtDelta(delta)}
                       </td>
-                      <td className="w-20">
-                        <div className="h-2 rounded" style={{ width: `${r.scoreEqual}%`, background: color(r.scoreEqual) }} />
+                      <td>
+                        <div className="h-1.5 rounded-sm" style={{ width: `${r.scoreEqual}%`, background: color(r.scoreEqual) }} />
                       </td>
                     </tr>
                   )
@@ -329,7 +346,12 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
           {selected && byIso[selected] ? (
             <CountryDetail data={data} iso3={selected} row={byIso[selected]} color={color} />
           ) : (
-            <p className="text-sm text-gray-500">Select a country on the map or in the rankings.</p>
+            <div className="py-10 text-center">
+              <div className="eyebrow mb-2">No country selected</div>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                Select a country on the map or in the rankings.
+              </p>
+            </div>
           )}
         </div>
       </div>
@@ -357,15 +379,21 @@ function CountryDetail({ data, iso3, row, color }) {
 
   return (
     <div>
-      <h3 className="font-bold text-lg">{row.country}</h3>
-      <p className="text-xs text-gray-500 mb-3">
-        {iso3} · score {fmtNum(row.scoreEqual, 1)}/100 ({row.year})
+      <div className="flex items-baseline justify-between flex-wrap gap-2">
+        <h3 className="text-lg font-bold tracking-tight">{row.country}</h3>
+        <span className="num text-xs" style={{ color: 'var(--faint)' }}>
+          {iso3} · {row.year}
+        </span>
+      </div>
+      <div className="flex items-baseline gap-2 mt-1 mb-4">
+        <span className="num text-2xl font-semibold">{fmtNum(row.scoreEqual, 1)}</span>
+        <span className="text-xs" style={{ color: 'var(--faint)' }}>/ 100 composite</span>
         {delta !== null && (
-          <span className={`ml-1 ${deltaClass(delta)}`}>
-            ({fmtDelta(delta)} vs {row.year - 1})
+          <span className="num text-xs" style={{ color: deltaColor(delta) }}>
+            {fmtDelta(delta)} vs {row.year - 1}
           </span>
         )}
-      </p>
+      </div>
 
       <div className="grid grid-cols-3 gap-3 mb-4">
         <Pillar label="Environmental" value={row.pillarE} color={color} />
@@ -375,30 +403,30 @@ function CountryDetail({ data, iso3, row, color }) {
 
       {indicatorRows.length > 0 && (
         <details className="mb-4">
-          <summary className="text-sm text-blue-700 dark:text-blue-300 cursor-pointer select-none">
+          <summary className="text-sm cursor-pointer select-none" style={{ color: 'var(--accent)' }}>
             Show the {indicatorRows.length} indicators behind this score
           </summary>
-          <table className="w-full text-xs mt-2" aria-label={`Indicator values for ${row.country}, ${row.year}`}>
+          <table className="data mt-2 text-xs" aria-label={`Indicator values for ${row.country}, ${row.year}`}>
             <thead>
-              <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
-                <th scope="col" className="py-1 pr-2 font-medium">Indicator</th>
-                <th scope="col" className="py-1 pr-2 font-medium">Pillar</th>
-                <th scope="col" className="py-1 font-medium text-right">Normalized (0–1)</th>
+              <tr>
+                <th scope="col">Indicator</th>
+                <th scope="col">Pillar</th>
+                <th scope="col" className="text-right pr-4 last:pr-0">Normalized (0–1)</th>
               </tr>
             </thead>
             <tbody>
               {indicatorRows.map((ind) => (
-                <tr key={ind.code} className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-1 pr-2">{ind.name}</td>
-                  <td className="py-1 pr-2 text-gray-500">{ind.pillar}</td>
-                  <td className="py-1 text-right font-mono">
+                <tr key={ind.code}>
+                  <td>{ind.name}</td>
+                  <td style={{ color: 'var(--faint)' }}>{ind.pillar}</td>
+                  <td className="num text-right pr-4 last:pr-0">
                     {ind.value === null ? '—' : ind.value.toFixed(3)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="text-[10px] text-gray-500 mt-1">
+          <p className="tick-note mt-1">
             Direction-adjusted, min-max normalized per year. Missing = not published for this year.
           </p>
         </details>
@@ -406,17 +434,17 @@ function CountryDetail({ data, iso3, row, color }) {
 
       <div className="text-sm space-y-1 mb-4">
         <div className="flex justify-between">
-          <span className="text-gray-500">Benchmark weight ({data.meta.latestWeightsYear})</span>
-          <span className="font-mono">{fmtNum(inBench, 2)}%</span>
+          <span style={{ color: 'var(--muted)' }}>Benchmark weight ({data.meta.latestWeightsYear})</span>
+          <span className="num">{fmtNum(inBench, 2)}%</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">ESG-tilted weight</span>
-          <span className="font-mono">{fmtNum(inTilt, 2)}%</span>
+          <span style={{ color: 'var(--muted)' }}>ESG-tilted weight</span>
+          <span className="num">{fmtNum(inTilt, 2)}%</span>
         </div>
       </div>
 
       <div>
-        <div className="text-sm text-gray-500 mb-1">Score history (equal-weight vs PCA)</div>
+        <div className="rule-label mb-1.5">Score history (equal-weight vs PCA)</div>
         <ScoreHistory hist={hist} selectedYear={row.year} />
       </div>
     </div>
@@ -430,16 +458,19 @@ function ScoreHistory({ hist, selectedYear }) {
       {hist.map((h) => (
         <div key={h.year} className="flex-1 flex flex-col items-center gap-0.5">
           <div
-            className={`w-full rounded-t ${h.year === selectedYear ? 'bg-blue-600' : 'bg-blue-200 dark:bg-blue-900'}`}
-            style={{ height: Math.max(h.scoreEqual, 2) + '%' }}
+            className="w-full rounded-t-sm"
+            style={{
+              height: Math.max(h.scoreEqual, 2) + '%',
+              background: h.year === selectedYear ? 'var(--accent)' : 'var(--line-strong)',
+            }}
             title={h.year + ': ' + fmtNum(h.scoreEqual, 1)}
           />
           <span
-            className={
-              'text-[9px] ' +
-              (h.year === selectedYear
-                ? 'text-blue-700 dark:text-blue-300 font-bold'
-                : 'text-gray-500')
+            className="num text-[9px]"
+            style={
+              h.year === selectedYear
+                ? { color: 'var(--ink)', fontWeight: 600 }
+                : { color: 'var(--faint)' }
             }
           >
             {String(h.year).slice(2)}
@@ -453,9 +484,9 @@ function ScoreHistory({ hist, selectedYear }) {
 function Pillar({ label, value, color }) {
   return (
     <div>
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="text-lg font-bold font-mono">{value === null ? '—' : fmtNum(value, 0)}</div>
-      <div className="h-1.5 rounded mt-1" style={{ width: '100%', background: color(value) }} />
+      <div className="rule-label">{label}</div>
+      <div className="text-lg font-semibold num mt-0.5">{value === null ? '—' : fmtNum(value, 0)}</div>
+      <div className="h-1.5 rounded-sm mt-1" style={{ width: '100%', background: color(value) }} />
     </div>
   )
 }

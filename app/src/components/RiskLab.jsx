@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area, Legend,
 } from 'recharts'
-import { PORTFOLIO_META, fmtPct, fmtNum } from '../hooks.js'
+import { PORTFOLIO_META, CHART, fmtPct, fmtNum } from '../hooks.js'
 
 const METRIC_ROWS = [
   { key: 'CAGR', label: 'CAGR (annual)', pct: true, freq: 'annual' },
@@ -52,23 +52,22 @@ export default function RiskLab({ data }) {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-bold">Portfolio risk, 2013–2023</h2>
-          <p className="text-sm text-gray-500">
+          <div className="eyebrow mb-1">01 — Backtest</div>
+          <h2 className="text-lg font-bold tracking-tight">Portfolio risk, 2013–2023</h2>
+          <p className="text-sm mt-0.5 max-w-xl" style={{ color: 'var(--muted)' }}>
             Three portfolios of the same {data.meta.universe}-country universe, annual rebalancing,
             no look-ahead. {freq === 'monthly' ? '131 monthly observations' : '11 annual observations'}.
           </p>
         </div>
-        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1" role="group" aria-label="Sampling frequency">
+        <div className="seg" role="group" aria-label="Sampling frequency">
           {['annual', 'monthly'].map((f) => (
             <button
               key={f}
               onClick={() => setFreq(f)}
               aria-pressed={freq === f}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium capitalize ${
-                freq === f ? 'bg-white dark:bg-gray-900 shadow' : 'text-gray-600 dark:text-gray-300'
-              }`}
+              className="capitalize"
             >
               {f}
             </button>
@@ -78,18 +77,22 @@ export default function RiskLab({ data }) {
 
       {/* Growth of $1 */}
       <div className="card">
-        <h3 className="font-semibold mb-1">Growth of $1</h3>
+        <h3 className="font-semibold tracking-tight mb-3">Growth of $1</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
             role="img"
             title="Growth of one dollar, 2013 to 2023"
             desc={`Cumulative growth of $1 for the three portfolios over 2013–2023 (${freq} sampling). Full values in the metrics table below.`}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={xTick * 2 - 1} />
-            <YAxis tick={{ fontSize: 11 }} domain={['auto', 'auto']} />
-            <Tooltip formatter={(v) => `$${Number(v).toFixed(3)}`} />
-            <Legend />
+            <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
+            <XAxis dataKey="label" tick={CHART.axisTick} interval={xTick * 2 - 1} axisLine={CHART.axisLine} tickLine={false} />
+            <YAxis tick={CHART.axisTick} domain={['auto', 'auto']} axisLine={false} tickLine={false} />
+            <Tooltip formatter={(v) => [`$${Number(v).toFixed(3)}`]} {...CHART.tooltip} />
+            <Legend
+              iconType="plainline"
+              iconSize={14}
+              wrapperStyle={{ fontSize: 12, color: 'var(--muted)', paddingTop: 8 }}
+            />
             {portfolios.map((p) => (
               <Line
                 key={p}
@@ -99,6 +102,7 @@ export default function RiskLab({ data }) {
                 stroke={PORTFOLIO_META[p]?.color}
                 strokeWidth={2}
                 dot={false}
+                activeDot={{ r: 3, strokeWidth: 0 }}
               />
             ))}
           </LineChart>
@@ -107,8 +111,8 @@ export default function RiskLab({ data }) {
 
       {/* Drawdown */}
       <div className="card">
-        <h3 className="font-semibold mb-1">Drawdown (%)</h3>
-        <p className="text-sm text-gray-500 mb-2">
+        <h3 className="font-semibold tracking-tight mb-1">Drawdown (%)</h3>
+        <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
           Monthly sampling reveals intra-year drawdowns annual sampling misses.
         </p>
         <ResponsiveContainer width="100%" height={220}>
@@ -117,10 +121,10 @@ export default function RiskLab({ data }) {
             title="Drawdown from running peak"
             desc={`Percentage decline from the running peak for each portfolio (${freq} sampling). Worst drawdown around −19% to −21%.`}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={xTick * 2 - 1} />
-            <YAxis tick={{ fontSize: 11 }} unit="%" />
-            <Tooltip formatter={(v) => `${Number(v).toFixed(2)}%`} />
+            <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
+            <XAxis dataKey="label" tick={CHART.axisTick} interval={xTick * 2 - 1} axisLine={CHART.axisLine} tickLine={false} />
+            <YAxis tick={CHART.axisTick} unit="%" axisLine={false} tickLine={false} />
+            <Tooltip formatter={(v) => [`${Number(v).toFixed(2)}%`]} {...CHART.tooltip} />
             {portfolios.map((p) => (
               <Area
                 key={p}
@@ -129,7 +133,7 @@ export default function RiskLab({ data }) {
                 name={PORTFOLIO_META[p]?.label ?? p}
                 stroke={PORTFOLIO_META[p]?.color}
                 fill={PORTFOLIO_META[p]?.color}
-                fillOpacity={0.08}
+                fillOpacity={0.07}
                 strokeWidth={1.5}
               />
             ))}
@@ -139,14 +143,17 @@ export default function RiskLab({ data }) {
 
       {/* Metrics table */}
       <div className="card overflow-x-auto">
-        <h3 className="font-semibold mb-3">Metrics ({freq})</h3>
-        <table className="w-full text-sm">
+        <h3 className="font-semibold tracking-tight mb-3">Metrics ({freq})</h3>
+        <table className="data">
           <thead>
-            <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
-              <th className="py-2 pr-4 font-medium">Metric</th>
+            <tr>
+              <th>Metric</th>
               {portfolios.map((p) => (
-                <th key={p} className="py-2 pr-4 font-medium">
-                  {PORTFOLIO_META[p]?.label ?? p}
+                <th key={p} className="text-right pr-4 last:pr-0">
+                  <span className="flex items-center justify-end gap-1.5 normal-case tracking-normal text-[11px]" style={{ color: 'var(--ink)' }}>
+                    <span className="inline-block w-2 h-2 rounded-[1px]" style={{ background: PORTFOLIO_META[p]?.color }} />
+                    {PORTFOLIO_META[p]?.label ?? p}
+                  </span>
                 </th>
               ))}
             </tr>
@@ -164,10 +171,10 @@ export default function RiskLab({ data }) {
                 mp[p] = m?.[row.key]
               }
               return (
-                <tr key={row.key} className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-2 pr-4 text-gray-600 dark:text-gray-300">{row.label}</td>
+                <tr key={row.key}>
+                  <td style={{ color: 'var(--muted)' }}>{row.label}</td>
                   {portfolios.map((p) => (
-                    <td key={p} className="py-2 pr-4 font-mono">
+                    <td key={p} className="num text-right pr-4 last:pr-0">
                       {row.pct ? fmtPct(mp[p]) : fmtNum(mp[p], 2)}
                     </td>
                   ))}
@@ -180,34 +187,56 @@ export default function RiskLab({ data }) {
 
       {/* Significance */}
       <div className="card overflow-x-auto">
-        <h3 className="font-semibold mb-1">Statistical significance vs benchmark</h3>
-        <p className="text-sm text-gray-500 mb-3">
+        <h3 className="font-semibold tracking-tight mb-1">Statistical significance vs benchmark</h3>
+        <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
           Vol: paired permutation test. Return: H0-recentered block bootstrap.
           {perMonthNote}
         </p>
-        <table className="w-full text-sm">
+        <table className="data">
           <thead>
-            <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
-              <th className="py-2 pr-4 font-medium">Strategy</th>
-              <th className="py-2 pr-4 font-medium">Vol diff{perMonthNote ? ' (monthly)' : ''}</th>
-              <th className="py-2 pr-4 font-medium">Vol p</th>
-              <th className="py-2 pr-4 font-medium">Ret diff{perMonthNote ? ' (monthly)' : ''}</th>
-              <th className="py-2 pr-4 font-medium">Ret p</th>
+            <tr>
+              <th>Strategy</th>
+              <th className="text-right">Vol diff{perMonthNote ? ' (monthly)' : ''}</th>
+              <th className="text-right">Vol p</th>
+              <th className="text-right">Ret diff{perMonthNote ? ' (monthly)' : ''}</th>
+              <th className="text-right pr-4 last:pr-0">Ret p</th>
             </tr>
           </thead>
           <tbody>
             {sigs.map((s) => (
-              <tr key={s.strategy} className="border-b border-gray-100 dark:border-gray-800">
-                <td className="py-2 pr-4">{PORTFOLIO_META[s.strategy]?.label ?? s.strategy}</td>
-                <td className="py-2 pr-4 font-mono">{fmtNum(s.volDiff * 100, 3)}pp</td>
-                <td className="py-2 pr-4 font-mono">
-                  <span className={s.volP < 0.05 ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : ''}>
+              <tr key={s.strategy}>
+                <td>{PORTFOLIO_META[s.strategy]?.label ?? s.strategy}</td>
+                <td className="num text-right">{fmtNum(s.volDiff * 100, 3)}pp</td>
+                <td className="num text-right">
+                  <span
+                    className={
+                      s.volP < 0.05
+                        ? 'font-semibold px-1.5 py-0.5 rounded-sm'
+                        : ''
+                    }
+                    style={
+                      s.volP < 0.05
+                        ? { background: 'rgba(46,107,94,0.12)', color: 'var(--teal)' }
+                        : undefined
+                    }
+                  >
                     {s.volP < 0.001 ? '<0.001' : s.volP.toFixed(3)}
                   </span>
                 </td>
-                <td className="py-2 pr-4 font-mono">{fmtNum(s.meanRetDiff * 100, 3)}pp</td>
-                <td className="py-2 pr-4 font-mono">
-                  <span className={s.meanRetP < 0.05 ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : ''}>
+                <td className="num text-right">{fmtNum(s.meanRetDiff * 100, 3)}pp</td>
+                <td className="num text-right pr-4 last:pr-0">
+                  <span
+                    className={
+                      s.meanRetP < 0.05
+                        ? 'font-semibold px-1.5 py-0.5 rounded-sm'
+                        : ''
+                    }
+                    style={
+                      s.meanRetP < 0.05
+                        ? { background: 'rgba(46,107,94,0.12)', color: 'var(--teal)' }
+                        : undefined
+                    }
+                  >
                     {s.meanRetP < 0.001 ? '<0.001' : s.meanRetP.toFixed(3)}
                   </span>
                 </td>
