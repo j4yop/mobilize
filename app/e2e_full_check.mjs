@@ -20,14 +20,21 @@ page.on('requestfailed', (r) => { if (!r.url().includes('favicon')) errors.push(
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 check('App loads, header present', await page.locator('h1:has-text("Mobilize")').count() === 1)
 
-// Header finding cards (4)
+// Overview tab is the default landing view
+check('Overview active by default', await page.locator('h2:has-text("Does ESG integration")').count() === 1)
+check('Overview shows engine cards', await page.locator('text=Sovereign ESG Risk Engine').count() >= 1)
+check('Overview evidence cards link to tabs', (await page.locator('text=view →').count()) === 4)
+
+// Overview finding cards (4)
 const findingCards = await page.locator('.finding-card').count()
 check('4 headline finding cards', findingCards === 4, `got ${findingCards}`)
 check('Finding card values render (no NaN/undefined)',
   await page.evaluate(() => !document.body.innerText.match(/NaN|undefined/)))
 
 // --- Risk Lab ---
-check('Risk Lab active by default', await page.locator('h2:has-text("Portfolio risk")').count() === 1)
+await page.click('nav button:has-text("Risk Lab")')
+await page.waitForTimeout(400)
+check('Risk Lab active', await page.locator('h2:has-text("Portfolio risk")').count() === 1)
 const growthPts = await page.locator('.recharts-line-curve').count()
 check('Growth chart lines render', growthPts === 3, `${growthPts} lines`)
 const ddAreas = await page.locator('.recharts-area').count()
@@ -107,7 +114,7 @@ mobile.on('pageerror', (e) => mErrors.push(String(e)))
 mobile.on('console', (m) => { if (m.type() === 'error') mErrors.push(m.text()) })
 await mobile.goto(BASE + '/', { waitUntil: 'networkidle' })
 const navCount = await mobile.locator('nav button').count()
-check('Mobile: nav buttons reachable (may wrap)', navCount === 5, `${navCount} buttons`)
+check('Mobile: nav buttons reachable (may wrap)', navCount === 6, `${navCount} buttons`)
 const hasHScroll = await mobile.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2)
 check('Mobile: no horizontal overflow', !hasHScroll)
 await mobile.click('nav button:has-text("ESG Map")')
@@ -206,7 +213,7 @@ await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 
 // ARIA tabs pattern
 const tabRoles = await page.locator('[role="tab"]').count()
-check('A11y: nav has tablist roles (5 tabs)', tabRoles === 5, `${tabRoles}`)
+check('A11y: nav has tablist roles (6 tabs)', tabRoles === 6, `${tabRoles}`)
 const ariaSel = await page.locator('[role="tab"][aria-selected="true"]').count()
 check('A11y: one tab aria-selected', ariaSel === 1)
 const panel = await page.locator('main[role="tabpanel"]').count()
@@ -216,12 +223,14 @@ check('A11y: main has tabpanel role', panel === 1)
 await page.locator('[role="tab"]').first().focus()
 await page.keyboard.press('ArrowRight')
 const activeId = await page.evaluate(() => document.activeElement?.id)
-check('A11y: ArrowRight moves tab focus', activeId === 'tab-map', activeId)
+check('A11y: ArrowRight moves tab focus', activeId === 'tab-risk', activeId)
 await page.keyboard.press('Enter')
 await page.waitForTimeout(300)
-check('A11y: Enter activates focused tab', await page.locator('h2:has-text("Sovereign ESG scores")').count() === 1)
+check('A11y: Enter activates focused tab', await page.locator('h2:has-text("Portfolio risk")').count() === 1)
 
 // Map circles keyboard-operable + labeled
+await page.click('nav button:has-text("ESG Map")')
+await page.waitForTimeout(400)
 await page.selectOption('select#esg-year-select', '2023').catch(() => {})
 const circleBtn = await page.locator('svg g[role="button"]').count()
 check('A11y: map countries are buttons (35)', circleBtn >= 35, `${circleBtn}`)

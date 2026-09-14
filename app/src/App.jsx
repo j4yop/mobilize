@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDashboardData } from './hooks.js'
+import Overview from './components/Overview.jsx'
 import RiskLab from './components/RiskLab.jsx'
 import EsgMap from './components/EsgMap.jsx'
 import PricingTest from './components/PricingTest.jsx'
@@ -7,6 +8,7 @@ import OutcomeLab from './components/OutcomeLab.jsx'
 import Methodology from './components/Methodology.jsx'
 
 const TABS = [
+  { id: 'overview', label: 'Overview' },
   { id: 'risk', label: 'Risk Lab' },
   { id: 'map', label: 'ESG Map' },
   { id: 'pricing', label: 'Pricing Test' },
@@ -27,7 +29,7 @@ function readHash() {
 
 function writeHash(state) {
   const params = new URLSearchParams()
-  if (state.tab && state.tab !== 'risk') params.set('tab', state.tab)
+  if (state.tab && state.tab !== 'overview') params.set('tab', state.tab)
   if (state.year) params.set('year', String(state.year))
   if (state.country) params.set('country', state.country)
   const hash = params.toString()
@@ -40,7 +42,7 @@ export default function App() {
   const initial = useRef(readHash())
   const [tab, setTab] = useState(() => {
     const t = initial.current.tab
-    return TABS.some((x) => x.id === t) ? t : 'risk'
+    return TABS.some((x) => x.id === t) ? t : 'overview'
   })
   const [deepLink, setDeepLink] = useState(() => {
     const s = initial.current
@@ -115,8 +117,6 @@ export default function App() {
     )
   }
 
-  const f = data.findings
-
   return (
     <div className="min-h-screen">
       <header
@@ -168,38 +168,7 @@ export default function App() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 pt-8 pb-16 space-y-8" id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        {/* Headline findings strip */}
-        <section aria-label="Headline findings">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px rounded-sm overflow-hidden"
-            style={{ background: 'var(--line-strong)', boxShadow: 'var(--shadow)' }}>
-            <FindingCard
-              eyebrow="Volatility"
-              value="−0.7pp"
-              note={`p ${f.volReduction.p_value}`}
-              text="ESG tilt significantly reduces vol."
-              positive
-            />
-            <FindingCard
-              eyebrow="Return cost"
-              value="≈ −0.1pp"
-              note={`p ${f.returnCost.p_value}`}
-              text="Not statistically distinguishable from zero."
-            />
-            <FindingCard
-              eyebrow="Max drawdown"
-              value="~ −19%"
-              note="similar across portfolios"
-              text="No drawdown protection from the tilt."
-            />
-            <FindingCard
-              eyebrow="ESG priced?"
-              value="No"
-              note={`F-M t = ${f.pricing.t_newey_west}, p = ${f.pricing.p_value}`}
-              text="Score is not a priced factor."
-            />
-          </div>
-        </section>
-
+        {tab === 'overview' && <Overview onNavigate={onTabChange} />}
         {tab === 'risk' && <RiskLab data={data} />}
         {tab === 'map' && (
           <EsgMap
@@ -225,20 +194,3 @@ export default function App() {
   )
 }
 
-function FindingCard({ eyebrow, value, note, text, positive }) {
-  return (
-    <div className="finding-card p-5" style={{ background: 'var(--paper)' }}>
-      <div className="eyebrow">{eyebrow}</div>
-      <div className="flex items-baseline gap-2 mt-1.5">
-        <span
-          className="text-[1.9rem] font-bold leading-none num"
-          style={{ letterSpacing: '-0.02em', color: positive ? 'var(--teal)' : 'var(--ink)' }}
-        >
-          {value}
-        </span>
-      </div>
-      <div className="text-[11px] num mt-1" style={{ color: 'var(--faint)' }}>{note}</div>
-      <div className="text-[13px] mt-2 leading-snug" style={{ color: 'var(--muted)' }}>{text}</div>
-    </div>
-  )
-}
