@@ -169,10 +169,6 @@ tests/        46 passing tests
 data/         cached panels (gitignored, reproducible)
 ```
 
-## Status
-
-All milestones complete: data pipeline (M1), backtests (M2, M2.5), dashboard (M3), Rhino Bond lab (M4), 2024 window + pillar pricing + outcome-bond family + CSV export/deep-linking (M5).
-
 ## License
 
 MIT
