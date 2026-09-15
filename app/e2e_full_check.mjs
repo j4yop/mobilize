@@ -108,7 +108,7 @@ const bgDark = await darkPage.evaluate(() => getComputedStyle(document.body).bac
 check('Light theme persists regardless of system preference', bgDark === 'rgb(245, 242, 236)')
 
 // --- Mobile viewport ---
-const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } })
+const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 const mErrors = []
 mobile.on('pageerror', (e) => mErrors.push(String(e)))
 mobile.on('console', (m) => { if (m.type() === 'error') mErrors.push(m.text()) })
@@ -127,6 +127,45 @@ const mHasScroll = await mobile.evaluate(() => {
   return t ? t.scrollWidth >= t.clientWidth : true
 })
 check('Mobile: metrics table scrollable container', mHasScroll)
+
+// --- Mobile optimization (regression guards) ---
+const headerH = await mobile.evaluate(() => document.querySelector('header').getBoundingClientRect().height)
+check('Mobile: sticky header compact (<160px)', headerH > 0 && headerH < 160, `${headerH.toFixed(0)}px`)
+for (const t of ['Pricing Test', 'Outcome Bond Lab', 'Risk Lab']) {
+  await mobile.click(`nav button:has-text("${t}")`)
+  await mobile.waitForTimeout(400)
+  const ox = await mobile.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth)
+  check(`Mobile: ${t} no horizontal overflow`, ox <= 2, `${ox}px`)
+}
+await mobile.click('nav button:has-text("ESG Map")')
+await mobile.waitForTimeout(400)
+const hitOk = await mobile.evaluate(() => {
+  const media = matchMedia('(pointer: coarse)').matches
+  const g = document.querySelector('svg g.map-dot')
+  if (!g) return { media, min: -1 }
+  const c = g.querySelector('circle')
+  return { media, min: c.getBBox().width / 2 } // hit radius in viewBox units
+})
+check('Mobile: coarse pointer detected', hitOk.media === true)
+check('Mobile: map dot hit radius >= 20 units (~40px on 390px vp)', hitOk.min >= 20, `r=${hitOk.min?.toFixed(1)}`)
+const navBtnH = await mobile.evaluate(() => {
+  const b = Array.from(document.querySelectorAll('nav[role=tablist] button'))
+  return Math.min(...b.map((el) => el.getBoundingClientRect().height))
+})
+check('Mobile: nav tab buttons >= 44px tall', navBtnH >= 44, `${navBtnH.toFixed(0)}px`)
+const minTarget = () => mobile.evaluate(() => {
+  let min = Infinity
+  for (const el of document.querySelectorAll('button, a, select, input')) {
+    const r = el.getBoundingClientRect()
+    if (r.width === 0 || r.height === 0) continue
+    min = Math.min(min, Math.min(r.width, r.height))
+  }
+  return min
+})
+check('Mobile: ESG Map min touch target >= 24px (2.5.8)', (await minTarget()) >= 24, `${(await minTarget()).toFixed(0)}px`)
+await mobile.click('nav button:has-text("Overview")')
+await mobile.waitForTimeout(300)
+check('Mobile: Overview min touch target >= 24px (2.5.8)', (await minTarget()) >= 24, `${(await minTarget()).toFixed(0)}px`)
 
 // --- Data bundle integrity ---
 const bundle = await page.evaluate(async () => {

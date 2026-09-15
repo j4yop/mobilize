@@ -107,7 +107,7 @@ export default function OutcomeLab({ data }) {
       </div>
 
       {/* Drift sensitivity */}
-      <div className="card">
+      <div className="card overflow-x-auto">
         <h3 className="font-semibold tracking-tight mb-1">Sensitivity to conservation effectiveness</h3>
         <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
           The drift (annual growth) assumption is the model's most sensitive input —

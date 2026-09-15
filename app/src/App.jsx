@@ -11,9 +11,9 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'risk', label: 'Risk Lab' },
   { id: 'map', label: 'ESG Map' },
-  { id: 'pricing', label: 'Pricing Test' },
-  { id: 'outcome', label: 'Outcome Bond Lab' },
-  { id: 'method', label: 'Methodology' },
+  { id: 'pricing', label: 'Pricing Test', short: 'Pricing' },
+  { id: 'outcome', label: 'Outcome Bond Lab', short: 'Outcome' },
+  { id: 'method', label: 'Methodology', short: 'Method' },
 ]
 
 // ---- URL hash deep-linking: #tab=map&year=2021&country=ZAF ----
@@ -127,11 +127,11 @@ export default function App() {
           borderBottom: '1px solid var(--line-strong)',
         }}
       >
-        <div className="max-w-6xl mx-auto px-6 pt-5 pb-0 flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-3 sm:pt-5 pb-0 flex flex-wrap items-end justify-between gap-x-8 gap-y-2">
           <div>
             <div className="flex items-baseline gap-3">
               <h1
-                className="text-[1.65rem] font-bold leading-none"
+                className="text-[1.35rem] sm:text-[1.65rem] font-bold leading-none"
                 style={{ letterSpacing: '-0.03em' }}
               >
                 Mobilize
@@ -140,7 +140,7 @@ export default function App() {
                 {data.meta.universe} sovereigns · {data.meta.window}
               </span>
             </div>
-            <p className="text-[13px] mt-1" style={{ color: 'var(--muted)' }}>
+            <p className="hidden sm:block text-[13px] mt-1" style={{ color: 'var(--muted)' }}>
               Sovereign ESG fixed-income risk engine, {data.meta.window} — does the tilt limit downside, and is it priced?
             </p>
           </div>
@@ -157,9 +157,17 @@ export default function App() {
                   aria-controls={`panel-${t.id}`}
                   tabIndex={selected ? 0 : -1}
                   onClick={() => onTabChange(t.id)}
-                  onKeyDown={(e) => onTabKeyDown(e, i)}                  className="tab-btn"
+                  onKeyDown={(e) => onTabKeyDown(e, i)}
+                  className="tab-btn"
                 >
-                  {t.label}
+                  {t.short ? (
+                    <>
+                      <span className="sm:hidden">{t.short}</span>
+                      <span className="hidden sm:inline">{t.label}</span>
+                    </>
+                  ) : (
+                    t.label
+                  )}
                 </button>
               )
             })}

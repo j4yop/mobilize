@@ -116,7 +116,7 @@ export default function PricingTest({ data }) {
 
       {/* Pillar-level Fama-MacBeth */}
       {data.famaMacbethPillars && (
-        <div className="card">
+        <div className="card overflow-x-auto">
           <h3 className="font-semibold tracking-tight mb-1">Pillar-level test: is any single pillar priced?</h3>
           <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
             The composite null could hide offsetting pillar effects — so we re-run the

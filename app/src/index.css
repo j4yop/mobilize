@@ -91,6 +91,27 @@ body {
   cursor: pointer;
   transition: color 150ms, background 150ms;
 }
+/* Coarse pointers: bigger tap targets without changing desktop sizing */
+@media (pointer: coarse) {
+  .tab-btn {
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
+  .tab-btn[aria-selected="true"]::after {
+    left: 1rem;
+    right: 1rem;
+  }
+  .btn {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+    min-height: 44px;
+  }
+  .seg button {
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    min-height: 44px;
+  }
+}
 .tab-btn:hover {
   color: var(--ink);
   background: rgba(42, 58, 72, 0.06);
@@ -235,6 +256,14 @@ table.data tbody tr:last-child td {
 .map-dot circle {
   transition: r 150ms, stroke 150ms;
 }
+/* Coarse pointers: enlarge the invisible hit circle on map dots.
+   Visible dot radius stays 8 so the desktop rendering is untouched;
+   only the transparent first circle (hit area) grows on touch devices. */
+@media (pointer: coarse) {
+  .map-dot > circle:first-of-type {
+    r: 21;
+  }
+}
 .map-dot:focus-visible {
   outline: none;
 }
@@ -266,6 +295,18 @@ table.data tbody tr:last-child td {
 .rank-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+/* Coarse pointers: ranking buttons are ~21px tall from text alone — grow the
+   tap target to the 2.5.8 minimum. Desktop (fine pointer) keeps dense rows. */
+@media (pointer: coarse) {
+  .rank-btn {
+    display: inline-block;
+    min-height: 44px;
+  }
+  .link {
+    display: inline-block;
+    min-height: 24px;
+  }
 }
 
 .search-input {
