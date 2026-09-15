@@ -19,6 +19,8 @@ export default function RiskLab({ data }) {
   const [freq, setFreq] = useState('monthly')
   const portfolios = data.meta.portfolios
   const series = data.series[freq]
+  // Single source of truth for the window label (en-dash for display).
+  const win = data.meta.window.replace('-', '–')
 
   // growth + drawdown chart data
   const labels = series[portfolios[0]]?.labels ?? []
@@ -55,10 +57,10 @@ export default function RiskLab({ data }) {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <div className="eyebrow mb-1">01 — Backtest</div>
-          <h2 className="text-lg font-bold tracking-tight">Portfolio risk, 2013–2023</h2>
+          <h2 className="text-lg font-bold tracking-tight">Portfolio risk, {win}</h2>
           <p className="text-sm mt-0.5 max-w-xl" style={{ color: 'var(--muted)' }}>
             Three portfolios of the same {data.meta.universe}-country universe, annual rebalancing,
-            no look-ahead. {freq === 'monthly' ? '131 monthly observations' : '11 annual observations'}.
+            no look-ahead. {labels.length} {freq} observations.
           </p>
         </div>
         <div className="seg" role="group" aria-label="Sampling frequency">
@@ -81,8 +83,8 @@ export default function RiskLab({ data }) {
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
             role="img"
-            title="Growth of one dollar, 2013 to 2023"
-            desc={`Cumulative growth of $1 for the three portfolios over 2013–2023 (${freq} sampling). Full values in the metrics table below.`}
+            title={`Growth of one dollar, ${win}`}
+            desc={`Cumulative growth of $1 for the three portfolios over ${win} (${freq} sampling). Full values in the metrics table below.`}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
             <XAxis dataKey="label" tick={CHART.axisTick} interval={xTick * 2 - 1} axisLine={CHART.axisLine} tickLine={false} />
