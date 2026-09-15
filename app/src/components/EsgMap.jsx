@@ -274,6 +274,45 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
         </div>
       </div>
 
+      <form
+        role="search"
+        onSubmit={(e) => e.preventDefault()}
+        className="flex flex-wrap items-end gap-x-4 gap-y-2"
+      >
+        <div className="w-full sm:w-72">
+          <label htmlFor="rankings-search" className="rule-label mb-1 block">
+            Find a country
+          </label>
+          <div className="flex items-center gap-1.5">
+            <input
+              id="rankings-search"
+              type="search"
+              className="search-input"
+              placeholder="e.g. Germany or DEU"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-describedby="rankings-search-status"
+            />
+            {query !== '' && (
+              <button
+                type="button"
+                className="btn shrink-0"
+                onClick={() => { setQuery(''); document.getElementById('rankings-search')?.focus() }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+        <p id="rankings-search-status" className="tick-note pb-2" role="status">
+          {noMatches
+            ? `No country matches “${query}”`
+            : q
+              ? `Showing ${displayed.length} of ${ranked.length} countries`
+              : ''}
+        </p>
+      </form>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:[&>:first-child]:order-2 lg:[&>:last-child]:order-1">
         {/* Rankings */}
         <div className="card overflow-hidden">
@@ -286,42 +325,6 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
               Download panel (CSV)
             </button>
           </div>
-          <form
-            role="search"
-            onSubmit={(e) => e.preventDefault()}
-            className="mb-3"
-          >
-            <label htmlFor="rankings-search" className="rule-label mb-1 block">
-              Find a country
-            </label>
-            <div className="flex items-center gap-1.5">
-              <input
-                id="rankings-search"
-                type="search"
-                className="search-input"
-                placeholder="e.g. Germany or DEU"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-describedby="rankings-search-status"
-              />
-              {query !== '' && (
-                <button
-                  type="button"
-                  className="btn shrink-0"
-                  onClick={() => { setQuery(''); document.getElementById('rankings-search')?.focus() }}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <p id="rankings-search-status" className="tick-note mt-1" role="status">
-              {noMatches
-                ? `No country matches “${query}”`
-                : q
-                  ? `Showing ${displayed.length} of ${ranked.length} countries`
-                  : ''}
-            </p>
-          </form>
           <div className="max-h-96 overflow-y-auto -mx-1.5 px-1.5">
             <table className="data" aria-labelledby="rankings-heading">
               <caption className="sr-only">
