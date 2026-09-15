@@ -82,6 +82,7 @@ function exportPanelCsv(data) {
 }
 
 export default function EsgMap({ data, initialYear, initialCountry }) {
+  const [query, setQuery] = useState('')
   const years = useMemo(() => {
     const ys = [...new Set(data.panel.map((r) => r.year))].sort()
     return ys
@@ -141,6 +142,12 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
   const rankByIso = {}
   ranked.forEach((r, i) => { rankByIso[r.iso3] = i + 1 })
 
+  const q = query.trim().toLowerCase()
+  const displayed = q
+    ? ranked.filter((r) => r.country.toLowerCase().includes(q) || r.iso3.toLowerCase().includes(q))
+    : ranked
+  const noMatches = q !== '' && displayed.length === 0
+
   const prevRanked = Object.values(prevByIso)
     .filter((r) => r.scoreEqual !== null)
     .sort((a, b) => b.scoreEqual - a.scoreEqual)
@@ -199,7 +206,7 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="w-full"
-          role="img"
+          role="group"
           aria-label={`World map of sovereign ESG scores for ${year}. Scores also listed in the rankings table.`}
         >
           <title>ESG score map, {year}</title>
@@ -224,10 +231,10 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
                 role="button"
                 tabIndex={0}
                 aria-label={`${r.country}: ESG score ${fmtNum(score, 1)} of 100`}
-                aria-pressed={isSel}
+                aria-current={isSel ? 'true' : undefined}
                 onClick={() => select(iso3)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(iso3) } }}
-                className="cursor-pointer focus:outline-none"
+                className="map-dot cursor-pointer"
               >
                 <circle cx={cx} cy={cy} r={radius + 6} fill="transparent" />
                 <circle
@@ -252,7 +259,7 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
         </svg>
         {/* legend */}
         <div className="flex items-center gap-2 mt-2 text-xs" style={{ color: 'var(--muted)' }}>
-          <span>Low ESG</span>
+          <span className="num">0</span>
           <div
             className="h-2 w-40 rounded-sm"
             style={{
@@ -261,11 +268,52 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
             }}
             aria-hidden="true"
           />
-          <span>High ESG</span>
+          <span className="num">100</span>
+          <span aria-hidden="true">·</span>
+          <span>Low ESG → High ESG</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <form
+        role="search"
+        onSubmit={(e) => e.preventDefault()}
+        className="flex flex-wrap items-end gap-x-4 gap-y-2"
+      >
+        <div className="w-full sm:w-72">
+          <label htmlFor="rankings-search" className="rule-label mb-1 block">
+            Find a country
+          </label>
+          <div className="flex items-center gap-1.5">
+            <input
+              id="rankings-search"
+              type="search"
+              className="search-input"
+              placeholder="e.g. Germany or DEU"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-describedby="rankings-search-status"
+            />
+            {query !== '' && (
+              <button
+                type="button"
+                className="btn shrink-0"
+                onClick={() => { setQuery(''); document.getElementById('rankings-search')?.focus() }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+        <p id="rankings-search-status" className="tick-note pb-2" role="status">
+          {noMatches
+            ? `No country matches “${query}”`
+            : q
+              ? `Showing ${displayed.length} of ${ranked.length} countries`
+              : ''}
+        </p>
+      </form>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:[&>:first-child]:order-2 lg:[&>:last-child]:order-1">
         {/* Rankings */}
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between gap-2 mb-3">
@@ -292,7 +340,7 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
                 </tr>
               </thead>
               <tbody>
-                {ranked.map((r, i) => {
+                {displayed.map((r, i) => {
                   const prev = prevByIso[r.iso3]
                   const delta =
                     prev && prev.scoreEqual !== null && r.scoreEqual !== null
@@ -304,28 +352,21 @@ export default function EsgMap({ data, initialYear, initialCountry }) {
                       : null
                   const isSel = selected === r.iso3
                   return (
-                    <tr
-                      key={r.iso3}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`${r.country}, rank ${i + 1}, score ${fmtNum(r.scoreEqual, 1)}`}
-                      aria-pressed={isSel}
-                      className="cursor-pointer"
-                      style={{
-                        background: isSel ? 'rgba(138,47,43,0.06)' : undefined,
-                        outline: 'none',
-                      }}
-                      onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = 'rgba(42,58,72,0.04)' }}
-                      onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = undefined }}
-                      onFocus={(e) => { e.currentTarget.style.background = 'rgba(138,47,43,0.06)' }}
-                      onBlur={(e) => { if (!isSel) e.currentTarget.style.background = undefined }}
-                      onClick={() => select(r.iso3)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(r.iso3) } }}
-                    >
+                    <tr key={r.iso3} className="rank-row" aria-current={isSel ? 'true' : undefined}>
                       <td className="num w-12 whitespace-nowrap" style={{ color: 'var(--faint)' }}>
                         {i + 1} <RankArrow change={rankChg} />
                       </td>
-                      <td>{r.country}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="rank-btn"
+                          aria-label={`${r.country}, rank ${i + 1}, score ${fmtNum(r.scoreEqual, 1)}`}
+                          aria-current={isSel ? 'true' : undefined}
+                          onClick={() => select(r.iso3)}
+                        >
+                          {r.country}
+                        </button>
+                      </td>
                       <td className="num text-right font-medium">{fmtNum(r.scoreEqual, 1)}</td>
                       <td className="num text-right text-xs" style={{ color: deltaColor(delta) }}>
                         {fmtDelta(delta)}

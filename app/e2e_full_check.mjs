@@ -71,7 +71,7 @@ await page.selectOption('select', '2015')
 await page.waitForTimeout(400)
 const avg2015 = await page.locator('text=/Universe average — 2015/').count()
 check('Year switch updates banner to 2015', avg2015 === 1)
-await page.click('table tbody tr:has-text("Sweden")')
+await page.click('table tbody button.rank-btn:has-text("Sweden")')
 await page.waitForTimeout(400)
 check('Country drilldown opens', await page.locator('h3:has-text("Sweden")').count() === 1)
 const pillarVals = await page.locator('text=/Environmental/').count()
@@ -229,7 +229,7 @@ check('F1: bundle panel includes 2024', lastPanelYear === 2024, `last=${lastPane
 check('F1: meta.window shows 2013-2024', await page.locator('header p').first().innerText().then((t) => t.includes('2013-2024')))
 
 // F3: indicator drilldown
-await page.click('table tbody tr:has-text("Sweden")')
+await page.click('table tbody button.rank-btn:has-text("Sweden")')
 await page.waitForTimeout(400)
 const detailsCount = await page.locator('details summary').count()
 check('F3: indicator drilldown toggle present', detailsCount === 1)
@@ -306,8 +306,70 @@ await page.waitForTimeout(300)
 check('A11y: keyboard selects country on map', await page.locator('h3.font-bold').count() >= 1)
 
 // Rankings rows keyboard + table headers
-const rowBtn = await page.locator('table tbody tr[tabindex="0"]').count()
-check('A11y: ranking rows focusable', rowBtn >= 35, `${rowBtn}`)
+const rowBtn = await page.locator('table tbody button.rank-btn').count()
+check('A11y: ranking rows have focusable buttons', rowBtn >= 35, `${rowBtn}`)
+const trRoles = await page.evaluate(() =>
+  Array.from(document.querySelectorAll('table.data tbody tr')).filter((tr) => tr.getAttribute('role') === 'button').length
+)
+check('A11y: no role=button on <tr> (row semantics preserved)', trRoles === 0, `${trRoles} button-rows`)
+const ariaPressedCount = await page.evaluate(() =>
+  Array.from(document.querySelectorAll('svg g, table tr')).filter((el) => el.hasAttribute('aria-pressed')).length
+)
+check('A11y: no aria-pressed (single-select uses aria-current)', ariaPressedCount === 0, `${ariaPressedCount}`)
+const mapRole = await page.locator('svg[role="group"]').count()
+check('A11y: map svg is role=group (not img with live children)', mapRole === 1)
+const dotFocusRing = await page.evaluate(() => {
+  const g = document.querySelector('svg g.map-dot')
+  if (!g) return false
+  g.focus()
+  const circle = g.querySelector('circle:nth-of-type(2)')
+  return getComputedStyle(circle).stroke.replace(/\s/g, '') === 'rgb(138,47,43)'
+})
+check('A11y: map dots show visible focus indicator', dotFocusRing)
+const rankFocusRing = await page.evaluate(() => {
+  const b = document.querySelector('table tbody button.rank-btn')
+  if (!b) return false
+  b.focus()
+  return getComputedStyle(b).outlineStyle === 'solid' && parseFloat(getComputedStyle(b).outlineWidth) >= 2
+})
+check('A11y: ranking buttons show visible focus outline', rankFocusRing)
+const searchCount = await page.locator('#rankings-search').count()
+check('A11y: country search input present with visible label', searchCount === 1 && (await page.locator('label[for="rankings-search"]').count()) === 1)
+await page.fill('#rankings-search', 'Germa')
+await page.waitForTimeout(200)
+const germaRows = await page.locator('table[aria-labelledby="rankings-heading"] tbody tr').count()
+check('A11y: search filters rankings to Germany', germaRows === 1, `${germaRows} rows`)
+const searchStatus = await page.locator('#rankings-search-status').innerText()
+check('A11y: search announces result count (role=status)', searchStatus.includes('1 of 35'), searchStatus)
+await page.fill('#rankings-search', 'zzz')
+await page.waitForTimeout(200)
+const noMatchText = await page.locator('#rankings-search-status').innerText()
+check('A11y: no-match search announces empty state', noMatchText.includes('No country matches'), noMatchText)
+await page.fill('#rankings-search', '')
+await page.waitForTimeout(200)
+const legendTicks = await page.evaluate(() => {
+  const nums = [...document.querySelectorAll('span.num')].map((s) => s.textContent.trim())
+  return nums.includes('0') && nums.includes('100')
+})
+check('A11y: legend has numeric 0/100 ticks', legendTicks)
+const tickOnPaper = await page.evaluate(() => {
+  const el = document.querySelector('.tick-note')
+  const bg = getComputedStyle(el.closest('.card') ?? document.body).backgroundColor
+  return { fg: getComputedStyle(el).color, bg }
+})
+// #666d64 on #fdfcf9 must exceed 4.5:1 — computed from the shipped palette, not typed literals
+const ratio = await page.evaluate(({ fg, bg }) => {
+  const lum = (c) => {
+    const [r, g, b] = c.match(/\d+/g).map(Number).map((v) => {
+      const s = v / 255
+      return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+    })
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  const l1 = lum(fg), l2 = lum(bg)
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+}, tickOnPaper)
+check('Contrast: --faint text on paper >= 4.5:1 (1.4.3)', ratio >= 4.5, `${ratio.toFixed(2)}:1 via ${tickOnPaper.fg}`)
 const thCount = await page.locator('table thead th').count()
 check('A11y: rankings table has header row', thCount >= 4, `${thCount} th`)
 const labelFor = await page.locator('label[for="esg-year-select"]').count()
