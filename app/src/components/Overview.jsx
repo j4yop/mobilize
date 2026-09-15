@@ -50,30 +50,41 @@ export default function Overview({ onNavigate }) {
   const findings = data?.findings
   const bond = data?.outcomeBond
 
+  // Every headline is read from the computed `findings` block in the data
+  // bundle — nothing is typed in by hand, so these cannot drift from the
+  // backtest output (see scripts/build_dashboard_data.py).
+  const v = findings?.volReduction
+  const r = findings?.returnCost
+  const dd = findings?.drawdowns
+
   const headline = [
     {
       eyebrow: 'Volatility',
-      value: '−0.7pp',
-      note: findings ? `p ${findings.volReduction.p_value}` : 'p <0.001',
-      text: 'The ESG tilt is a significant volatility reducer.',
-      positive: true,
+      value: v?.value ?? '—',
+      note: v ? `p ${v.p_value}` : '',
+      text: v?.significant
+        ? 'The ESG tilt is a significant volatility reducer.'
+        : 'No statistically significant volatility effect.',
+      positive: Boolean(v?.significant),
     },
     {
       eyebrow: 'Return cost',
-      value: '≈ −0.1pp',
-      note: findings ? `p ${findings.returnCost.p_value}` : 'p 0.25–0.35',
-      text: 'Not statistically distinguishable from zero.',
+      value: r?.value ?? '—',
+      note: r ? `p ${r.p_value}` : '',
+      text: r?.significant
+        ? 'A statistically significant cost in return.'
+        : 'Not statistically distinguishable from zero.',
     },
     {
       eyebrow: 'Drawdowns',
-      value: '≈ −21%',
-      note: 'similar across portfolios',
+      value: dd?.value ?? '—',
+      note: dd ? `${dd.spread_pp}pp spread` : '',
       text: 'No drawdown protection from the tilt.',
     },
     {
       eyebrow: 'Rhino Bond premium',
-      value: bond ? `+${Math.abs(bond.baseline.concessionPp).toFixed(2)}pp` : '+0.88pp',
-      note: bond ? `vs vanilla IBRD (${(bond.baseline.vanillaYield * 100).toFixed(2)}%)` : 'vs vanilla IBRD (1.75%)',
+      value: bond ? `+${Math.abs(bond.baseline.concessionPp).toFixed(2)}pp` : '—',
+      note: bond ? `vs vanilla IBRD (${(bond.baseline.vanillaYield * 100).toFixed(2)}%)` : '',
       text: 'Outcome risk pays — but is hyper-sensitive to drift.',
       positive: true,
     },
@@ -180,7 +191,7 @@ export default function Overview({ onNavigate }) {
           </div>
           <div className="text-[12.5px]" style={{ color: 'var(--muted)' }}>
             <span className="rule-label block mb-1">Code</span>
-            Python 3.11 · pandas · numpy · scipy — 46 passing tests, fully reproducible
+            Python 3.11 · pandas · numpy · scipy — 60 passing tests, fully reproducible
           </div>
           <a
             className="link text-[12.5px] num"

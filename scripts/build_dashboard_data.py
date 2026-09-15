@@ -23,11 +23,12 @@ from mobilize.backtest.metrics import (  # noqa: E402
     drawdown_series,
     summary_table,
 )
-from mobilize.backtest.monthly import monthly_metrics  # noqa: E402
+from mobilize.backtest.monthly import MONTHS_PER_YEAR, monthly_metrics  # noqa: E402
 from mobilize.backtest.significance import compare_portfolios  # noqa: E402
 from mobilize.data.indicators import COUNTRIES, INDICATORS  # noqa: E402
 from mobilize.portfolio.construction import (  # noqa: E402
     BENCHMARK,
+    TILTED,
     composition_summary,
     weight_panel,
 )
@@ -194,26 +195,97 @@ def main() -> None:
     fm_summary["tNeweyWest"] = round(t_nw, 3)
     fm_summary["pValue"] = round(float(erfc(abs(t_nw) / np.sqrt(2))), 4)
 
-    # ---- 7. Headline findings (pre-written, displayed on landing) ----
+    # ---- 7. Headline findings ----
+    # COMPUTED from the backtest above, never hardcoded. A hand-written headline
+    # block silently drifts the moment the window, universe, or estimator
+    # changes: this block previously advertised a -0.7pp volatility reduction
+    # and a -28bp / t=-0.91 Fama-MacBeth gamma that the shipped series did not
+    # support (the real values were about -0.28pp and -19.7bp / t=-0.68).
+    # Direction of every conclusion is unchanged; only magnitudes were stale.
+
+    def _p_str(p: float) -> str:
+        if not np.isfinite(p):
+            return "n/a"
+        return "<0.001" if p < 0.001 else f"{p:.2f}"
+
+    sig_m = sig_monthly  # indexed by strategy
+    tilted_m = sig_m.loc[TILTED]
+
+    # Volatility: the annualized level difference from the metrics table is the
+    # interpretable headline; the permutation test supplies its p-value. The two
+    # agree by construction (monthly vol_diff * sqrt(12) == ann_vol difference).
+    vol_diff_ann_pp = (
+        float(monthly_m.loc[TILTED, "ann_vol"]) - float(monthly_m.loc[BENCHMARK, "ann_vol"])
+    ) * 100
+    vol_diff_test_pp = float(tilted_m["vol_diff"]) * np.sqrt(MONTHS_PER_YEAR) * 100
+    vol_p = float(tilted_m["vol_p"])
+
+    # Return: monthly paired mean difference, annualized by x12.
+    ret_diff_ann_pp = float(tilted_m["mean_ret_diff"]) * MONTHS_PER_YEAR * 100
+    ret_p = float(tilted_m["mean_ret_p"])
+
+    # Drawdowns: worst and best max-drawdown across the three portfolios.
+    dd = monthly_m["max_drawdown"].astype(float)
+    dd_worst = float(dd.min())
+    dd_spread_pp = (float(dd.max()) - dd_worst) * 100
+
+    fm_gamma_bp = float(fm_summary["gammaMean"]) * 10_000
+    fm_t = float(fm_summary["tNeweyWest"])
+    fm_p = float(fm_summary["pValue"])
+    fm_significant = abs(fm_t) > 1.96
+
     findings = {
+        "window": f"{annual.index.min()}-{annual.index.max()}",
+        "nMonths": int(len(monthly)),
         "volReduction": {
-            "tilted_vs_benchmark_annualized_pp": -0.7,
-            "p_value": "<0.001",
-            "statement": "ESG tilting significantly reduces portfolio volatility (~0.7pp annualized).",
+            "tilted_vs_benchmark_annualized_pp": round(vol_diff_ann_pp, 2),
+            "test_annualized_pp": round(vol_diff_test_pp, 2),
+            "p_value": _p_str(vol_p),
+            "significant": bool(vol_p < 0.05),
+            "value": f"\u2212{abs(vol_diff_ann_pp):.2f}pp" if vol_diff_ann_pp < 0 else f"+{vol_diff_ann_pp:.2f}pp",
+            "benchmark_vol": round(float(monthly_m.loc[BENCHMARK, "ann_vol"]), 4),
+            "tilted_vol": round(float(monthly_m.loc[TILTED, "ann_vol"]), 4),
+            "statement": (
+                "ESG tilting significantly reduces portfolio volatility "
+                f"({abs(vol_diff_ann_pp):.2f}pp annualized, p {_p_str(vol_p)})."
+                if vol_p < 0.05
+                else "ESG tilting does not significantly change portfolio volatility "
+                f"({vol_diff_ann_pp:+.2f}pp annualized, p {_p_str(vol_p)})."
+            ),
         },
         "returnCost": {
-            "estimate_pp_per_year": -0.1,
-            "p_value": "0.25-0.35",
-            "statement": "The tilt's return cost is small and not statistically distinguishable from zero.",
+            "estimate_pp_per_year": round(ret_diff_ann_pp, 2),
+            "p_value": _p_str(ret_p),
+            "significant": bool(ret_p < 0.05),
+            "value": f"\u2248 \u2212{abs(ret_diff_ann_pp):.2f}pp",
+            "statement": (
+                "The tilt's return cost is small and not statistically distinguishable "
+                f"from zero ({ret_diff_ann_pp:+.2f}pp/yr, p {_p_str(ret_p)})."
+                if ret_p >= 0.05
+                else "The tilt carries a statistically significant return cost "
+                f"({ret_diff_ann_pp:+.2f}pp/yr, p {_p_str(ret_p)})."
+            ),
         },
         "drawdowns": {
-            "statement": "Max drawdowns are near-identical across portfolios; ESG tilting did not limit the worst loss.",
+            "worst_max_drawdown": round(dd_worst, 4),
+            "spread_pp": round(dd_spread_pp, 2),
+            "value": f"\u2248 \u2212{abs(dd_worst) * 100:.0f}%",
+            "statement": (
+                "Max drawdowns are near-identical across portfolios "
+                f"({dd_spread_pp:.1f}pp spread); ESG tilting did not limit the worst loss."
+            ),
         },
         "pricing": {
-            "gamma_bp_per_month": -28.2,
-            "t_newey_west": -0.91,
-            "p_value": 0.36,
-            "statement": "The sovereign ESG score is not significantly priced in returns (Fama-MacBeth).",
+            "gamma_bp_per_month": round(fm_gamma_bp, 2),
+            "t_newey_west": round(fm_t, 3),
+            "p_value": round(fm_p, 2),
+            "significant": bool(fm_significant),
+            "value": "Yes" if fm_significant else "No",
+            "statement": (
+                "The sovereign ESG score is significantly priced in returns (Fama-MacBeth)."
+                if fm_significant
+                else "The sovereign ESG score is not significantly priced in returns (Fama-MacBeth)."
+            ),
         },
     }
 

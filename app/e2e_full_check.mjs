@@ -138,6 +138,70 @@ check('Bundle has all 15 sections', Object.keys(bundle).length === 15, Object.ke
 check('Panel has 455 rows (2012-2024)', bundle.panel.length === 455)
 check('No null scores in latest year', bundle.panel.filter(r => r.year === 2024 && r.scoreEqual === null).length === 0)
 
+// --- Regression guard: headline findings must agree with the data ---------
+// These were once hardcoded strings in build_dashboard_data.py and silently
+// drifted from the backtest (advertising -0.7pp when the series gave -0.28pp).
+// Now computed, but this asserts it stays that way.
+const consistency = await page.evaluate((b) => {
+  const get = (p, f) => b.metrics.find((m) => m.portfolio === p && m.frequency === f)
+  const volT = get('esg_tilted', 'monthly')
+  const volB = get('benchmark', 'monthly')
+  const expectVolPp = Number(((volT.ann_vol - volB.ann_vol) * 100).toFixed(2))
+  const expectGammaBp = Number((b.famaMacbeth.gammaMean * 10000).toFixed(2))
+  const worstDd = Math.min(...b.metrics.filter((m) => m.frequency === 'monthly').map((m) => m['Max Drawdown']))
+  return {
+    expectVolPp,
+    claimedVolPp: b.findings.volReduction.tilted_vs_benchmark_annualized_pp,
+    testVolPp: b.findings.volReduction.test_annualized_pp,
+    expectGammaBp,
+    claimedGammaBp: b.findings.pricing.gamma_bp_per_month,
+    claimedT: b.findings.pricing.t_newey_west,
+    actualT: b.famaMacbeth.tNeweyWest,
+    expectDd: Number(worstDd.toFixed(4)),
+    claimedDd: b.findings.drawdowns.worst_max_drawdown,
+    expectMonths: b.series.monthly.benchmark.labels.length,
+    claimedMonths: b.findings.nMonths,
+  }
+}, bundle)
+// Tolerances: the bundle rounds for display (ann_vol to 4dp, gammaMean to 6dp),
+// so a value re-derived in JS cannot match the Python-computed finding exactly.
+// 0.011 allows for one unit in the last displayed digit on both sides.
+const close = (a, b, tol) =>
+  typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= tol
+const fmt = (x) => (typeof x === 'number' ? x.toFixed(4) : String(x))
+
+check('Findings: vol reduction matches metrics table', close(consistency.claimedVolPp, consistency.expectVolPp, 0.011), `claimed ${fmt(consistency.claimedVolPp)}pp vs metrics-derived ${fmt(consistency.expectVolPp)}pp`)
+check('Findings: vol reduction agrees with permutation test', close(consistency.claimedVolPp, consistency.testVolPp, 0.011), `${fmt(consistency.claimedVolPp)} vs ${fmt(consistency.testVolPp)}`)
+check('Findings: Fama-MacBeth gamma matches bundle', close(consistency.claimedGammaBp, consistency.expectGammaBp, 0.011), `claimed ${fmt(consistency.claimedGammaBp)}bp vs bundle ${fmt(consistency.expectGammaBp)}bp`)
+check('Findings: Fama-MacBeth t matches bundle', consistency.claimedT === consistency.actualT, `${consistency.claimedT} vs ${consistency.actualT}`)
+check('Findings: drawdown matches metrics', close(consistency.claimedDd, consistency.expectDd, 0.0002), `claimed ${fmt(consistency.claimedDd)} vs metrics ${fmt(consistency.expectDd)}`)
+check('Findings: month count matches series', consistency.claimedMonths === consistency.expectMonths, `${consistency.claimedMonths} vs ${consistency.expectMonths}`)
+
+// The Overview headline must render the computed value, not a typed-in one.
+// The design system uses a typographic minus (U+2212), so normalise before
+// comparing against the JSON number.
+await page.click('nav button:has-text("Overview")')
+await page.waitForTimeout(400)
+const volCardText = (await page.locator('.finding-card').first().innerText()).replace(/\u2212/g, '-')
+check('Overview headline shows computed vol value', volCardText.includes(String(consistency.claimedVolPp)), volCardText.split('\n').slice(0, 3).join(' / '))
+
+// --- Regression guard: the ESG map must respond to the year selector ------
+await page.click('nav button:has-text("ESG Map")')
+await page.waitForSelector('select#esg-year-select')
+const fillsFor = async (year) => {
+  await page.selectOption('select#esg-year-select', String(year))
+  await page.waitForTimeout(350)
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll('svg g[role="button"] circle:nth-child(2)'))
+      .map((c) => c.getAttribute('fill')),
+  )
+}
+const fills2024 = await fillsFor(2024)
+const fills2015 = await fillsFor(2015)
+check('Map: 35 countries coloured', fills2024.length === 35, `${fills2024.length}`)
+check('Map: colours change with year', JSON.stringify(fills2024) !== JSON.stringify(fills2015))
+check('Map: no uncoloured circles', fills2024.every((f) => f && f.startsWith('rgb')), 'all scored')
+
 // keyboard navigation: tab through nav buttons
 await page.click('nav button:has-text("Risk Lab")')
 const focusWorked = await page.evaluate(() => {

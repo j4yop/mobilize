@@ -54,16 +54,16 @@ Backtesting 35 sovereigns over 143 months:
 
 | Portfolio | Ann. Return | Ann. Vol | Sharpe | Max DD |
 |---|---|---|---|---|
-| Benchmark (GDP-weighted) | 0.99% | 5.03% | -0.17 | -21.3% |
-| ESG-screened (drop bottom quintile) | 0.98% | 4.99% | -0.18 | -21.3% |
-| ESG-tilted (GDP × score²) | 0.90% | 4.78% | -0.20 | -20.9% |
+| Benchmark (GDP-weighted) | 0.89% | 5.03% | -0.19 | -21.3% |
+| ESG-screened (drop bottom quintile) | 0.88% | 4.99% | -0.20 | -21.3% |
+| ESG-tilted (GDP × score²) | 0.83% | 4.76% | -0.22 | -20.9% |
 
 **The inference, stated honestly:**
 
-- **Volatility**: ESG-tilting significantly reduces portfolio volatility (~0.7–0.8pp annualized, p<0.001) — driven by the tilt's shift toward low-beta developed-market sovereigns.
-- **Return cost**: small and not statistically distinguishable from zero (p=0.25–0.35).
+- **Volatility**: ESG-tilting significantly reduces portfolio volatility (0.28pp annualized, p<0.001) — driven by the tilt's shift toward low-beta developed-market sovereigns.
+- **Return cost**: small and not statistically distinguishable from zero (-0.07pp/yr, p=0.48).
 - **Drawdowns**: near-identical (~-21%); ESG tilting did **not** limit the worst loss.
-- **Pricing**: the ESG factor is **not significantly priced** (Fama–MacBeth gamma = -28bp/month per 100 ESG points, Newey–West t = -0.91, p = 0.36) — and this null holds at pillar level too: none of E (p=0.86), S (p=0.68), or G (p=0.40) is individually priced. The tilt is a **risk-profile shift, not an alpha source**.
+- **Pricing**: the ESG factor is **not significantly priced** (Fama–MacBeth gamma = -19.7bp/month per 100 ESG points, Newey–West t = -0.68, p = 0.50) — and this null holds at pillar level too: none of E (p=0.85), S (p=0.68), or G (p=0.40) is individually priced. The tilt is a **risk-profile shift, not an alpha source**.
 
 > **Headline:** *In this 35-country backtest, ESG integration acted as a significant volatility reducer at no statistically significant return cost, but provided no drawdown protection and no evidence of ESG being priced into sovereign returns.* This nuance — not "ESG wins" or "ESG loses" — is exactly the kind of result the World Bank Treasury's own [Sustainable Fixed-Income Strategy](https://treasury.worldbank.org/en/about/unit/treasury/impact/sustainable-fixed-income-strategy) research engages with.
 
@@ -128,7 +128,7 @@ FRED (yields) ──┘         │
 
 **Analysis** — Python 3.11+ · pandas · numpy · scipy · pytest · ruff
 
-**Dashboard** — React 18 · Vite · Tailwind CSS 4 · Recharts (fully static, no server)
+**Dashboard** — React 19 · Vite 8 · Tailwind CSS 4 · Recharts (fully static, no server)
 
 **Data** — 100% free, no API keys required:
 - **World Bank API** (`api.worldbank.org`) — macro & sovereign-ESG indicators, 35 countries × 15 years
@@ -145,12 +145,18 @@ All proxy assumptions (e.g., sovereign bond returns proxied from yield data) are
 pip install -e ".[dev]"
 make data                            # fetch WB indicators -> ESG score panel
 python scripts/run_backtest.py      # annual + monthly backtests + Fama-MacBeth
+python scripts/run_outcome.py        # Rhino Bond Monte Carlo lab + bond family
 python scripts/build_dashboard_data.py  # export static JSON bundle
+
+# Tests
+pytest -q                            # 60 unit tests
+ruff check src tests scripts         # lint
 
 # Dashboard (app/)
 cd app && npm install
 npm run dev      # local dev server
 npm run build    # static build -> dist/
+npm run test:e2e # build + serve + Playwright checks (89 assertions)
 vercel           # deploy from repo root (vercel.json config included)
 ```
 
@@ -164,8 +170,9 @@ src/
   backtest/   returns, metrics, significance, yields, monthly, Fama-MacBeth
   outcome/    rhino bond cash-flows, Monte Carlo, pricing
 app/          static React dashboard (Vercel-ready)
+              run-e2e.mjs  build + serve + Playwright suite (npm run test:e2e)
 scripts/      pipeline entry points
-tests/        46 passing tests
+tests/        60 passing tests
 data/         cached panels (gitignored, reproducible)
 ```
 

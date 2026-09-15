@@ -15,7 +15,7 @@ export default function Methodology() {
             <Ul>
               <li>
                 <b>Macro & ESG indicators</b>: World Bank Open Data API (keyless), 35 countries,
-                annual, 2012–2023. ESG composite follows the World Bank Sovereign ESG framework
+                annual, 2012–2024. ESG composite follows the World Bank Sovereign ESG framework
                 style: 5 environmental, 5 social, 6 governance (WGI) indicators — direction-adjusted,
                 min-max normalized per year, equal-weight pillars, composite = mean of pillars.
                 A PCA composite is computed alongside (rank correlation ≈ 0.94).
@@ -85,8 +85,8 @@ export default function Methodology() {
                 Minimum cross-section: 8 countries.
               </li>
               <li>
-                Annual-frequency tests run on 11 observations — treat those p-values as weak
-                evidence; monthly (131 obs) is the primary frequency for inference.
+                Annual-frequency tests run on 12 observations — treat those p-values as weak
+                evidence; monthly (143 obs) is the primary frequency for inference.
               </li>
             </Ul>
           </Section>
@@ -157,7 +157,7 @@ export default function Methodology() {
           <Section title="Known limitations">
             <Ul>
               <li>35-country universe; results need not generalize to broader EM universes.</li>
-              <li>2013–2023 window: a falling-then-rising US rate cycle; no GFC-type regime.</li>
+              <li>2013–2024 window: a falling-then-rising US rate cycle; no GFC-type regime.</li>
               <li>Duration approximation ignores convexity and roll-down; fine for small moves.</li>
               <li>Scores rely on annual macro data — no news/sentiment component.</li>
               <li>
@@ -171,7 +171,7 @@ export default function Methodology() {
             <p className="text-sm" style={{ color: 'var(--muted)' }}>
               <code className="num">make data</code> → <code className="num">python scripts/run_backtest.py</code> →{' '}
               <code className="num">python scripts/build_dashboard_data.py</code>. All data from free public APIs
-              (World Bank, FRED); no API keys required. Tests: <code className="num">pytest</code> (46 passing).
+              (World Bank, FRED); no API keys required. Tests: <code className="num">pytest</code> (60 passing).
             </p>
           </Section>
         </div>
